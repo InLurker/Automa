@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Matrix Trails + Text Wall + Hitbox Mask (Smooth: Stripe Twinkle + Step Cap)</title>
+<style>
+  :root { --ui-bg:#111; --ui-border:#1f1f1f; }
+  body{
+    margin:0; background:#000; color:#ddd; min-height:100svh;
+    font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans",Arial,
+                 "PingFang SC","Hiragino Sans","Microsoft YaHei","Noto Sans JP","Noto Sans KR",sans-serif;
+    display:grid; grid-template-rows:auto 1fr;
+  }
+  #controls{
+    display:grid; gap:.75rem;
+    grid-template-columns:repeat(6,minmax(140px,1fr));
+    padding:12px 16px; background:var(--ui-bg); border-bottom:1px solid var(--ui-border);
+    align-items:end;
+  }
+  #controls label{ font-size:.9rem; display:flex; flex-direction:column; gap:.35rem }
+  #controls input,#controls select,#controls textarea{
+    background:#1a1a1a; color:#fff; border:1px solid #2a2a2a; border-radius:6px; padding:.5rem .6rem
+  }
+  #controls textarea{ resize:vertical; min-height:42px }
+  .span-2{ grid-column:span 2 } .span-3{ grid-column:span 3 }
+  @media (max-width:900px){
+    #controls{ grid-template-columns:1fr 1fr }
+    .span-2,.span-3{ grid-column:span 2 }
+  }
+  .stage{
+    position:relative; overflow:hidden;
+    background: radial-gradient(1100px 800px at 20% 40%, #060606 0%, #020202 50%, #000 100%);
+  }
+  canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <label class="span-2">Large word (hitbox mask)
+    <input id="largeText" type="text" value="你好">
+  </label>
+
+  <label>Wall fill
+    <select id="bgType">
+      <option value="random" selected>Randomized</option>
+      <option value="fixed">Fixed text</option>
+    </select>
+  </label>
+
+  <label id="langWrap">Random script
+    <select id="lang">
+      <option value="alphabet">Alphabet</option>
+      <option value="chinese" selected>Chinese</option>
+      <option value="japanese">Japanese</option>
+      <option value="korean">Korean</option>
+    </select>
+  </label>
+
+  <label id="fixedWrap" class="span-2" style="display:none">Fixed wall text (repeats)
+    <textarea id="fixed" rows="2">你好世界</textarea>
+  </label>
+
+  <label>Rain speed (steps/sec)
+    <input id="speed" type="number" min="1" step="1" value="12">
+  </label>
+
+  <label>Cell size (px)
+    <input id="cell" type="number" min="8" step="1" value="16">
+  </label>
+
+  <label class="span-2">Wall brightness (0–0.25)
+    <input id="wallB" type="number" min="0" max="0.25" step="0.01" value="0.06">
+  </label>
+
+  <label class="span-2">Wall lift on rain (0–0.20)
+    <input id="wallLift" type="number" min="0" max="0.20" step="0.01" value="0.05">
+  </label>
+
+  <label class="span-2">Wall twinkle FPS (0–30)
+    <input id="twFps" type="number" min="0" max="30" step="1" value="12">
+  </label>
+
+  <label class="span-2">Outside trail strength (0–1)
+    <input id="outStrength" type="number" min="0" max="1" step="0.01" value="0.18">
+  </label>
+
+  <label class="span-2">Hitbox trail strength (0–1)
+    <input id="inStrength" type="number" min="0" max="1" step="0.01" value="1.00">
+  </label>
+
+  <label class="span-2">Outside decay (0.50–0.98)
+    <input id="decayOut" type="number" min="0.50" max="0.98" step="0.01" value="0.72">
+  </label>
+
+  <label class="span-2">Hitbox decay (0.50–0.995)
+    <input id="decayIn" type="number" min="0.50" max="0.995" step="0.005" value="0.90">
+  </label>
+
+  <label class="span-2">Hitbox glow (0–30)
+    <input id="glow" type="number" min="0" max="30" step="1" value="14">
+  </label>
+
+  <label class="span-2">Word overlay mode
+    <select id="wordMode">
+      <option value="serif" selected>Serif style</option>
+      <option value="wall">Wall style</option>
+    </select>
+  </label>
+
+  <label class="span-2">Word overlay opacity (0–1)
+    <input id="wordOpacity" type="number" min="0" max="1" step="0.05" value="0.60">
+  </label>
+</div>
+
+<div class="stage" id="stage">
+  <canvas id="main"></canvas>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const main = document.getElementById('main');
+  const ctx = main.getContext('2d', { alpha:true });
+
+  // UI
+  const inpText = document.getElementById('largeText');
+  const inpType = document.getElementById('bgType');
+  const selLang = document.getElementById('lang');
+  const wrapLang  = document.getElementById('langWrap');
+  const wrapFixed = document.getElementById('fixedWrap');
+  const txtFixed = document.getElementById('fixed');
+
+  const inpSpeed = document.getElementById('speed');
+  const inpCell  = document.getElementById('cell');
+
+  const inpWallB = document.getElementById('wallB');
+  const inpWallLift = document.getElementById('wallLift');
+  const inpTwFps = document.getElementById('twFps');
+
+  const inpOutStrength = document.getElementById('outStrength');
+  const inpInStrength  = document.getElementById('inStrength');
+  const inpDecayOut = document.getElementById('decayOut');
+  const inpDecayIn  = document.getElementById('decayIn');
+  const inpGlow = document.getElementById('glow');
+
+  const selWordMode = document.getElementById('wordMode');
+  const inpWordOpacity = document.getElementById('wordOpacity');
+
+  // Offscreen: base wall cache
+  const wallCanvas = document.createElement('canvas');
+  const wallCtx = wallCanvas.getContext('2d', { alpha:true });
+
+  // Offscreen: mask at grid resolution
+  const maskCanvas = document.createElement('canvas');
+  const maskCtx = maskCanvas.getContext('2d', { willReadFrequently:true });
+
+  // DPR cap for perf
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+  // Layout
+  let wCss = 1, hCss = 1;
+  let cell = 16, cols = 1, rows = 1;
+  let xCenter = new Float32Array(0);
+  let yCenter = new Float32Array(0);
+
+  // Fonts
+  let fontPx = 12;
+  let monoFont = '';
+  let serifFont = '';
+
+  // Wall chars
+  let wallChars = new Uint32Array(0);
+  let baseChars = new Uint32Array(0);
+  let fixedPool = new Uint32Array(0);
+
+  // Twinkle params
+  let twPhase = new Float32Array(0);
+  let twSpeed = new Float32Array(0);
+
+  // Hitbox mask + indices
+  let hitMask = new Uint8Array(0);
+  let hiByCol = [];
+
+  // Trails
+  let trail = new Float32Array(0);
+  let active = [];
+  let activeFlag = new Uint8Array(0);
+
+  // Drops
+  let dropPos = new Float32Array(0);
+  let dropSpd = new Float32Array(0);
+
+  // Dirty wall repaint (per cell)
+  let dirtyFlag = new Uint8Array(0);
+  const dirtyCells = [];
+
+  // Twinkle incremental repaint (stripe repaint)
+  let twRowCursor = 0;
+  let nextTwinkleAt = 0;
+  let forceFullWallPaint = true;
+
+  // Glyph cache (avoid String.fromCodePoint allocations)
+  const glyphCache = new Map();
+  function glyph(cp){
+    let s = glyphCache.get(cp);
+    if (!s){
+      s = String.fromCodePoint(cp);
+      glyphCache.set(cp, s);
+    }
+    return s;
+  }
+
+  function clamp(n,a,b){ return Math.min(b, Math.max(a, n)); }
+
+  function syncUI(){
+    const isRandom = inpType.value === 'random';
+    wrapLang.style.display  = isRandom ? '' : 'none';
+    wrapFixed.style.display = isRandom ? 'none' : '';
+  }
+
+  function randomWallCodepoint(set){
+    switch(set){
+      case 'alphabet': return 33 + Math.floor(Math.random()*94);
+      case 'chinese':  return 0x4E00 + Math.floor(Math.random()*2000);
+      case 'japanese': return (Math.random()<0.6)
+        ? (0x3041 + Math.floor(Math.random()*86))
+        : (0x30A1 + Math.floor(Math.random()*86));
+      case 'korean':   return 0xAC00 + Math.floor(Math.random()*1115);
+      default:         return 63;
+    }
+  }
+
+  function buildFixedPool(str){
+    const arr = Array.from((str && str.trim()) ? str.trim() : '你好世界');
+    if (!arr.length) return new Uint32Array([0x4E00]);
+    const cps = new Uint32Array(arr.length);
+    for (let i=0;i<arr.length;i++) cps[i] = arr[i].codePointAt(0);
+    return cps;
+  }
+
+  function replacementCodepoint(){
+    if (inpType.value === 'random'){
+      return randomWallCodepoint(selLang.value);
+    }
+    // fixed mode: mutate using fixed pool (stays “in-world”)
+    if (fixedPool.length){
+      return fixedPool[(Math.random() * fixedPool.length) | 0];
+    }
+    return 63;
+  }
+
+  function ensureCenters(){
+    xCenter = new Float32Array(cols);
+    yCenter = new Float32Array(rows);
+    for (let c=0;c<cols;c++) xCenter[c] = c*cell + cell/2;
+    for (let r=0;r<rows;r++) yCenter[r] = r*cell + cell/2;
+  }
+
+  function setupFonts(){
+    fontPx = Math.max(6, cell - 4);
+    monoFont  = `${fontPx}px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Noto Sans Mono",monospace`;
+    serifFont = `700 ${fontPx}px "Times New Roman","Georgia","Times",serif`;
+
+    wallCtx.font = monoFont;
+    wallCtx.textAlign = 'center';
+    wallCtx.textBaseline = 'middle';
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+  }
+
+  function rebuildAll(){
+    cell = Math.max(8, Number(inpCell.value) || 16);
+
+    wCss = Math.max(1, stage.clientWidth);
+    hCss = Math.max(1, stage.clientHeight);
+
+    cols = Math.max(1, Math.ceil(wCss / cell));
+    rows = Math.max(1, Math.ceil(hCss / cell));
+    const total = cols * rows;
+
+    const cw = Math.floor(wCss * dpr);
+    const ch = Math.floor(hCss * dpr);
+    main.width = cw; main.height = ch;
+    wallCanvas.width = cw; wallCanvas.height = ch;
+
+    // CSS-space transforms
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.imageSmoothingEnabled = false;
+
+    wallCtx.setTransform(dpr,0,0,dpr,0,0);
+    wallCtx.imageSmoothingEnabled = false;
+
+    maskCanvas.width = cols;
+    maskCanvas.height = rows;
+
+    ensureCenters();
+    setupFonts();
+
+    wallChars = new Uint32Array(total);
+    baseChars = new Uint32Array(total);
+    twPhase = new Float32Array(total);
+    twSpeed = new Float32Array(total);
+
+    trail = new Float32Array(total);
+    activeFlag = new Uint8Array(total);
+    active = [];
+
+    dropPos = new Float32Array(cols);
+    dropSpd = new Float32Array(cols);
+    for (let c=0;c<cols;c++){
+      dropPos[c] = Math.random() * rows;
+      dropSpd[c] = 0.6 + Math.random() * 1.4;
+    }
+
+    fixedPool = buildFixedPool(txtFixed.value);
+
+    const mode = inpType.value;
+    const script = selLang.value;
+
+    if (mode === 'fixed'){
+      const pool = fixedPool.length ? fixedPool : new Uint32Array([63]);
+      for (let i=0;i<total;i++){
+        const cp = pool[i % pool.length];
+        wallChars[i] = cp;
+        baseChars[i] = cp;
+        twPhase[i] = Math.random() * Math.PI * 2;
+        twSpeed[i] = 0.15 + Math.random() * 0.35;
+      }
+    } else {
+      for (let i=0;i<total;i++){
+        const cp = randomWallCodepoint(script);
+        wallChars[i] = cp;
+        baseChars[i] = cp;
+        twPhase[i] = Math.random() * Math.PI * 2;
+        twSpeed[i] = 0.15 + Math.random() * 0.35;
+      }
+    }
+
+    dirtyFlag = new Uint8Array(total);
+    dirtyCells.length = 0;
+
+    rasterizeHitMask(inpText.value);
+
+    // twinkle scheduling
+    twRowCursor = 0;
+    nextTwinkleAt = 0;
+    forceFullWallPaint = true;
+  }
+
+  function rasterizeHitMask(word){
+    if (!cols || !rows) return;
+
+    maskCtx.clearRect(0,0,cols,rows);
+
+    const cleaned = (word || ' ')
+      .replace(/\r\n?/g, '\n')
+      .replace(/\\n/g, '\n');
+    const lines = cleaned.split('\n').map(l => l.length ? l : ' ');
+
+    const families = '"Times New Roman","Georgia","Times",serif';
+    let size = Math.max(4, Math.min(cols, rows));
+    const maxW = cols * 0.9;
+    const maxH = rows * 0.9;
+
+    function measure(sz){
+      maskCtx.font = `700 ${sz}px ${families}`;
+      let maxLineWidth = 1, maxA = 0, maxD = 0;
+      const per = [];
+      for (const line of lines){
+        const m = maskCtx.measureText(line);
+        const left = m.actualBoundingBoxLeft ?? 0;
+        const right = m.actualBoundingBoxRight ?? (m.width ?? 0);
+        const width = Math.max(m.width || 0, left + right, 1);
+        const a = m.actualBoundingBoxAscent || sz*0.8;
+        const d = m.actualBoundingBoxDescent || sz*0.2;
+        maxLineWidth = Math.max(maxLineWidth, width);
+        maxA = Math.max(maxA, a);
+        maxD = Math.max(maxD, d);
+        per.push({ a, d });
+      }
+      const lead = sz*0.2;
+      const lh = maxA + maxD + lead;
+      const first = per[0], last = per[per.length-1];
+      const totalH = first.a + last.d + Math.max(0, per.length-1)*lh;
+      return { maxLineWidth, totalH, lh, per };
+    }
+
+    let m = measure(size);
+    for (let i=0;i<7;i++){
+      const scale = Math.min(maxW / m.maxLineWidth, maxH / Math.max(1, m.totalH));
+      if (scale >= 0.995) break;
+      size = Math.max(4, size * scale);
+      m = measure(size);
+    }
+
+    maskCtx.fillStyle = '#fff';
+    maskCtx.textAlign = 'center';
+    maskCtx.textBaseline = 'alphabetic';
+    maskCtx.font = `700 ${size}px ${families}`;
+
+    const first = m.per[0], last = m.per[m.per.length-1];
+    const totalH = first.a + last.d + Math.max(0, lines.length-1)*m.lh;
+    let y = rows/2 - totalH/2 + first.a;
+
+    for (let i=0;i<lines.length;i++){
+      maskCtx.fillText(lines[i], cols/2, y);
+      y += m.lh;
+    }
+
+    const data = maskCtx.getImageData(0,0,cols,rows).data;
+    const total = cols * rows;
+    if (hitMask.length !== total) hitMask = new Uint8Array(total);
+
+    const tmp = Array.from({ length: cols }, () => []);
+    const TH = 64;
+    for (let i=0;i<total;i++){
+      const on = data[i*4 + 3] > TH;
+      hitMask[i] = on ? 1 : 0;
+      if (on) tmp[i % cols].push(i);
+    }
+    hiByCol = tmp.map(a => Uint32Array.from(a));
+  }
+
+  function twinkleFactor(i, nowMs){
+    const twFps = clamp(Number(inpTwFps.value) || 0, 0, 30);
+    if (twFps <= 0) return 1;
+    const t = nowMs * 0.001;
+    return 0.86 + 0.14 * Math.sin(twPhase[i] + t * twSpeed[i]);
+  }
+
+  function markDirty(idx){
+    if (!dirtyFlag[idx]){
+      dirtyFlag[idx] = 1;
+      dirtyCells.push(idx);
+    }
+  }
+
+  function paintCellOnWall(idx, nowMs){
+    const wallB = clamp(Number(inpWallB.value) || 0.06, 0, 0.25);
+
+    const r = (idx / cols) | 0;
+    const c = idx - r * cols;
+
+    // clear just this cell
+    wallCtx.clearRect(c*cell, r*cell, cell, cell);
+
+    const tw = twinkleFactor(idx, nowMs);
+    const a = wallB * tw;
+
+    wallCtx.fillStyle = `rgba(255,255,255,${a.toFixed(4)})`;
+    wallCtx.fillText(glyph(wallChars[idx]), xCenter[c], yCenter[r]);
+  }
+
+  function flushDirtyCells(nowMs){
+    if (!dirtyCells.length) return;
+    for (let i=0;i<dirtyCells.length;i++){
+      const idx = dirtyCells[i];
+      dirtyFlag[idx] = 0;
+      paintCellOnWall(idx, nowMs);
+    }
+    dirtyCells.length = 0;
+  }
+
+  function paintWallRows(rStart, rCount, nowMs){
+    const wallB = clamp(Number(inpWallB.value) || 0.06, 0, 0.25);
+    const rEnd = Math.min(rows, rStart + rCount);
+
+    // clear the stripe once
+    wallCtx.clearRect(0, rStart*cell, wCss, (rEnd - rStart)*cell);
+
+    for (let r=rStart; r<rEnd; r++){
+      const y = yCenter[r];
+      for (let c=0;c<cols;c++){
+        const idx = r*cols + c;
+        const tw = twinkleFactor(idx, nowMs);
+        const a = wallB * tw;
+        wallCtx.fillStyle = `rgba(255,255,255,${a.toFixed(4)})`;
+        wallCtx.fillText(glyph(wallChars[idx]), xCenter[c], y);
+      }
+    }
+  }
+
+  function paintFullWall(nowMs){
+    wallCtx.clearRect(0,0,wCss,hCss);
+    paintWallRows(0, rows, nowMs);
+  }
+
+  function maybeTwinkleStripe(nowMs){
+    const twFps = clamp(Number(inpTwFps.value) || 0, 0, 30);
+    if (twFps <= 0) return;
+
+    const interval = 1000 / twFps;
+    if (nowMs < nextTwinkleAt) return;
+    nextTwinkleAt = nowMs + interval;
+
+    // budget-based stripe size (~2000 cells per tick)
+    const cellsBudget = 2000;
+    const stripeRows = Math.max(1, Math.floor(cellsBudget / Math.max(1, cols)));
+
+    paintWallRows(twRowCursor, stripeRows, nowMs);
+    twRowCursor += stripeRows;
+    if (twRowCursor >= rows) twRowCursor = 0;
+  }
+
+  function addActive(idx){
+    if (activeFlag[idx]) return;
+    activeFlag[idx] = 1;
+    active.push(idx);
+  }
+
+  function stepSimulation(){
+    const outStrength = clamp(Number(inpOutStrength.value) || 0.18, 0, 1);
+    const inStrength  = clamp(Number(inpInStrength.value)  || 1.00, 0, 1);
+    const decayOut = clamp(Number(inpDecayOut.value) || 0.72, 0.50, 0.98);
+    const decayIn  = clamp(Number(inpDecayIn.value)  || 0.90, 0.50, 0.995);
+    const isFixed = inpType.value === 'fixed';
+
+    // decay active only; restore fixed pattern when dead
+    for (let i=0; i<active.length; ){
+      const idx = active[i];
+      const dec = hitMask[idx] ? decayIn : decayOut;
+      const v = trail[idx] * dec;
+
+      if (v < 0.006){
+        trail[idx] = 0;
+        activeFlag[idx] = 0;
+
+        if (isFixed && wallChars[idx] !== baseChars[idx]){
+          wallChars[idx] = baseChars[idx];
+          markDirty(idx);
+        }
+
+        active[i] = active[active.length - 1];
+        active.pop();
+        continue;
+      }
+
+      trail[idx] = v;
+      i++;
+    }
+
+    // drops: fill all crossed rows to avoid “holes”
+    for (let c=0;c<cols;c++){
+      const prev = dropPos[c];
+      const next = prev + dropSpd[c];
+
+      const r0 = Math.floor(prev);
+      const r1 = Math.floor(next);
+
+      for (let r=r0; r<=r1; r++){
+        if (r < 0 || r >= rows) continue;
+
+        const idx = r*cols + c;
+
+        // mutate wall (script-consistent / fixed-pool-consistent)
+        const cp = replacementCodepoint();
+        if (wallChars[idx] !== cp){
+          wallChars[idx] = cp;
+          markDirty(idx);
+        }
+
+        const inj = hitMask[idx] ? inStrength : outStrength;
+        if (inj > trail[idx]) trail[idx] = inj;
+        addActive(idx);
+      }
+
+      dropPos[c] = next;
+
+      if (dropPos[c] > rows + 6){
+        if (Math.random() > 0.92){
+          dropPos[c] = -Math.random() * 8;
+          dropSpd[c] = 0.6 + Math.random() * 1.4;
+        }
+      }
+    }
+  }
+
+  function render(nowMs){
+    // Twinkle stripes first (cheap amortized), then apply char mutations (dirty)
+    if (forceFullWallPaint){
+      forceFullWallPaint = false;
+      paintFullWall(nowMs);
+    } else {
+      maybeTwinkleStripe(nowMs);
+    }
+    flushDirtyCells(nowMs);
+
+    // base wall
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,main.width, main.height);
+    ctx.drawImage(wallCanvas, 0, 0);
+
+    // overlays
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.imageSmoothingEnabled = false;
+
+    const lift = clamp(Number(inpWallLift.value) || 0, 0, 0.20);
+
+    // PASS 1: subtle wall lift (white)
+    if (lift > 0.0005){
+      ctx.font = monoFont;
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = '#fff';
+
+      for (let i=0;i<active.length;i++){
+        const idx = active[i];
+        const v = trail[idx];
+        const a = Math.min(lift, lift * (0.4 + 0.6 * v));
+        if (a <= 0.001) continue;
+
+        const r = (idx / cols) | 0;
+        const c = idx - r*cols;
+        ctx.globalAlpha = a;
+        ctx.fillText(glyph(wallChars[idx]), xCenter[c], yCenter[r]);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // PASS 2: trails
+    const outFill = 'rgba(0, 140, 60, 1)';
+    const inFill  = '#86ffd0';
+
+    // outside
+    ctx.font = monoFont;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    for (let i=0;i<active.length;i++){
+      const idx = active[i];
+      if (hitMask[idx]) continue;
+
+      const v = trail[idx];
+      const a = Math.min(0.28, v * 0.35);
+      if (a <= 0.001) continue;
+
+      const r = (idx / cols) | 0;
+      const c = idx - r*cols;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = outFill;
+      ctx.fillText(glyph(wallChars[idx]), xCenter[c], yCenter[r]);
+    }
+
+    // hitbox glow
+    const glow = clamp(Number(inpGlow.value) || 14, 0, 30);
+    ctx.shadowBlur = glow;
+    ctx.shadowColor = inFill;
+
+    for (let i=0;i<active.length;i++){
+      const idx = active[i];
+      if (!hitMask[idx]) continue;
+
+      const v = trail[idx];
+      const a = Math.min(1, v);
+      if (a <= 0.001) continue;
+
+      const r = (idx / cols) | 0;
+      const c = idx - r*cols;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = inFill;
+      ctx.fillText(glyph(wallChars[idx]), xCenter[c], yCenter[r]);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+
+    // PASS 3: word overlay (opacity == visibility)
+    const op = clamp(Number(inpWordOpacity.value) || 0, 0, 1);
+    if (op > 0.001){
+      ctx.font = (selWordMode.value === 'serif') ? serifFont : monoFont;
+      ctx.fillStyle = `rgba(255,255,255,${op.toFixed(4)})`;
+
+      for (let c=0;c<cols;c++){
+        const idxs = hiByCol[c];
+        if (!idxs || idxs.length === 0) continue;
+        const x = xCenter[c];
+        for (let k=0;k<idxs.length;k++){
+          const idx = idxs[k];
+          const r = (idx / cols) | 0;
+          ctx.fillText(glyph(wallChars[idx]), x, yCenter[r]);
+        }
+      }
+    }
+  }
+
+  // Main loop with step cap (prevents stutter catch-up)
+  let last = 0, acc = 0;
+  const MAX_STEPS_PER_FRAME = 3;  // big stutter killer
+  function loop(nowMs){
+    nowMs = nowMs || performance.now();
+    if (!last) last = nowMs;
+    const dt = Math.min(50, nowMs - last);
+    last = nowMs;
+
+    const stepsPerSec = clamp(Number(inpSpeed.value) || 12, 1, 120);
+    const stepMs = 1000 / stepsPerSec;
+
+    acc += dt;
+    let steps = 0;
+    while (acc >= stepMs && steps < MAX_STEPS_PER_FRAME){
+      stepSimulation();
+      acc -= stepMs;
+      steps++;
+    }
+    if (steps === MAX_STEPS_PER_FRAME){
+      // drop excess lag rather than hitching
+      acc = 0;
+    }
+
+    render(nowMs);
+    requestAnimationFrame(loop);
+  }
+
+  // Events
+  inpText.addEventListener('input', () => rasterizeHitMask(inpText.value));
+
+  inpType.addEventListener('change', () => { syncUI(); rebuildAll(); });
+  selLang.addEventListener('change', rebuildAll);
+  txtFixed.addEventListener('input', rebuildAll);
+
+  inpCell.addEventListener('input', rebuildAll);
+
+  inpWallB.addEventListener('input', () => { forceFullWallPaint = true; });
+  inpTwFps.addEventListener('input', () => { forceFullWallPaint = true; });
+
+  new ResizeObserver(rebuildAll).observe(stage);
+  window.addEventListener('resize', rebuildAll);
+
+  // Init
+  syncUI();
+  rebuildAll();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
