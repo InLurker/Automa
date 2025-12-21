@@ -108,16 +108,13 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-border/40 scrollbar-track-transparent">
-      <div className="px-6 pt-6 pb-4 border-b border-border/40">
-        <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground/70">
-          {automa.theme}
-        </p>
-        <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-          {automa.description}
+      <div className="px-6 pt-4 pb-2">
+        <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+          Control
         </p>
       </div>
 
-      <div className="p-6 space-y-3">
+      <div className="px-6 pb-6 space-y-3">
         {(Object.keys(groupedParams) as ParameterGroup[]).map((group) => (
           <ControlSection key={group} title={group}>
             <div className="space-y-3">{groupedParams[group].map((param) => renderControl(param))}</div>

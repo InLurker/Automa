@@ -9,7 +9,7 @@ interface Particle {
   life: number;
 }
 
-export function DriftAutoma({ values, width, height }: AutomaComponentProps) {
+export function DriftAutoma({ values, width, height, isPaused }: AutomaComponentProps & { isPaused?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const animationRef = useRef<number>();
@@ -40,6 +40,11 @@ export function DriftAutoma({ values, width, height }: AutomaComponentProps) {
     canvas.width = width;
     canvas.height = height;
 
+    if (isPaused) {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      return;
+    }
+
     const resetParticle = (p: Particle) => {
       p.x = Math.random() * width;
       p.y = Math.random() * height;
@@ -56,21 +61,17 @@ export function DriftAutoma({ values, width, height }: AutomaComponentProps) {
       const noiseAmount = values.noise / 100;
 
       particlesRef.current.forEach((p) => {
-        // Update velocity
         p.vx = Math.cos(dirRad) * values.speed + (Math.random() - 0.5) * noiseAmount * 2;
         p.vy = Math.sin(dirRad) * values.speed + (Math.random() - 0.5) * noiseAmount * 2;
 
-        // Update position
         p.x += p.vx;
         p.y += p.vy;
         p.life += 0.001;
 
-        // Reset if out of bounds or life expired
         if (p.x < 0 || p.x > width || p.y < 0 || p.y > height || p.life > 1) {
           resetParticle(p);
         }
 
-        // Draw
         const alpha = values.intensity * (1 - p.life);
         ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
         ctx.beginPath();
@@ -88,7 +89,7 @@ export function DriftAutoma({ values, width, height }: AutomaComponentProps) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [values, width, height]);
+  }, [values, width, height, isPaused]);
 
   // Pause when hidden
   useEffect(() => {

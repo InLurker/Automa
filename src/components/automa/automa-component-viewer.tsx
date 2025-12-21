@@ -7,9 +7,10 @@ import { PulseAutoma } from "./renderers/pulse";
 interface AutomaComponentViewerProps {
   automa: AutomaRegistry;
   values: Record<string, any>;
+  isPaused?: boolean;
 }
 
-export function AutomaComponentViewer({ automa, values }: AutomaComponentViewerProps) {
+export function AutomaComponentViewer({ automa, values, isPaused = false }: AutomaComponentViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -45,7 +46,7 @@ export function AutomaComponentViewer({ automa, values }: AutomaComponentViewerP
       return <div className="text-muted-foreground text-sm">Initializing...</div>;
     }
 
-    const props = { values, ...dimensions };
+    const props = { values, ...dimensions, isPaused };
 
     switch (automa.renderer.component) {
       case "drift":
@@ -60,8 +61,17 @@ export function AutomaComponentViewer({ automa, values }: AutomaComponentViewerP
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-background flex items-center justify-center">
+    <div
+      ref={containerRef}
+      className="relative w-full h-full bg-background flex items-center justify-center"
+      style={{ minHeight: "calc(100vh - 4rem)" }}
+    >
       {renderAutoma()}
+      {isPaused && (
+        <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center text-xs uppercase tracking-[0.3em] text-muted-foreground">
+          Paused
+        </div>
+      )}
     </div>
   );
 }

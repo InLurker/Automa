@@ -5,9 +5,10 @@ interface AutomaViewerProps {
   automa: AutomaRegistry;
   values: Record<string, any>;
   isLive: boolean;
+  isPaused?: boolean;
 }
 
-export function AutomaViewer({ automa, values, isLive }: AutomaViewerProps) {
+export function AutomaViewer({ automa, values, isLive, isPaused = false }: AutomaViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isReady, setIsReady] = useState(false);
   const initializedRef = useRef(false);
@@ -49,13 +50,21 @@ export function AutomaViewer({ automa, values, isLive }: AutomaViewerProps) {
   }, [values, isLive, isReady]);
 
   return (
-    <div className="relative w-full h-full bg-background">
+    <div
+      className="relative w-full h-full bg-background"
+      style={{ minHeight: "calc(100vh - 4rem)" }}
+    >
       <iframe
         ref={iframeRef}
         src={automa.renderer.path}
         className="w-full h-full border-0"
         title={automa.title}
       />
+      {isPaused && (
+        <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center text-xs uppercase tracking-[0.3em] text-muted-foreground">
+          Paused
+        </div>
+      )}
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-background">
           <div className="text-sm text-muted-foreground">Loading...</div>

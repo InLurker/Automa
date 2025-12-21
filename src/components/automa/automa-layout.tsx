@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AutomaRegistry } from "@/types/automa";
 import { ControlsPanel } from "./controls-panel";
 import { AutomaViewer } from "./automa-viewer";
@@ -12,58 +12,95 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
   const [values, setValues] = useState(automa.defaults);
   const [isLive, setIsLive] = useState(true);
   const [showControls, setShowControls] = useState(true);
+  const [animationPaused, setAnimationPaused] = useState(false);
+  const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pauseTimeoutRef.current) {
+        clearTimeout(pauseTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleValuesChange = (newValues: Record<string, any>, live: boolean) => {
     setValues(newValues);
     setIsLive(live);
   };
 
+  const pauseAroundToggle = (next: boolean) => {
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+    }
+    setAnimationPaused(true);
+    setShowControls(next);
+    pauseTimeoutRef.current = setTimeout(() => {
+      setAnimationPaused(false);
+    }, 400);
+  };
+
   return (
-    <div className="flex flex-1 overflow-hidden bg-background text-foreground">
+    <div className="relative flex flex-1 min-h-[calc(100vh-4rem)] w-full overflow-hidden bg-background text-foreground">
       {showControls && (
-        <aside className="w-[320px] border-r border-border/30 bg-background/80 backdrop-blur-sm flex flex-col">
-          <div className="px-6 py-4 border-b border-border/30 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                Control
-              </p>
-              <p className="text-xs text-muted-foreground/70 mt-1">{automa.theme}</p>
+        <aside className="relative w-[360px] border-r border-border/30 bg-background/85 backdrop-blur flex flex-col">
+          <div className="px-6 py-5 border-b border-border/30">
+            <div className="space-y-1 pr-9">
+              <h2 className="text-base font-semibold tracking-tight text-foreground">{automa.title}</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">{automa.description}</p>
             </div>
             <button
-              onClick={() => setShowControls(false)}
-              className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => pauseAroundToggle(false)}
+              className="absolute top-4 right-4 inline-flex items-center justify-center rounded-full border border-border/40 bg-background/80 text-foreground/80 hover:text-foreground hover:border-border px-2 py-2 transition-colors"
+              aria-label="Hide controls"
             >
-              Hide
+              <span className="material-symbols-outlined text-base leading-none">
+                collapse_content
+              </span>
             </button>
           </div>
+
           <ControlsPanel automa={automa} onValuesChange={handleValuesChange} />
         </aside>
       )}
 
-      {!showControls && (
-        <button
-          onClick={() => setShowControls(true)}
-          className="absolute z-10 top-24 left-4 text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md border border-border/40 bg-background/90 backdrop-blur"
-        >
-          Show Controls
-        </button>
-      )}
-
-      <section className="flex-1 flex flex-col bg-background">
-        <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-            Animation
-          </p>
-          <span className="text-xs text-muted-foreground/80">{automa.title}</span>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          {automa.renderer.type === "component" ? (
-            <AutomaComponentViewer automa={automa} values={values} />
-          ) : (
-            <AutomaViewer automa={automa} values={values} isLive={isLive} />
-          )}
+      <section className="flex-1 bg-background">
+        <div className="w-full h-full min-h-[calc(100vh-4rem)] overflow-hidden">
+        {automa.renderer.type === "component" ? (
+          <AutomaComponentViewer automa={automa} values={values} isPaused={animationPaused} />
+        ) : (
+          <AutomaViewer automa={automa} values={values} isLive={isLive} isPaused={animationPaused} />
+        )}
         </div>
       </section>
+
+      {!showControls && (
+        <div className="absolute z-20 top-6 left-6 max-w-sm w-full border border-border/40 bg-background/85 backdrop-blur-lg shadow-2xl rounded-2xl p-4 pr-12">
+          <div className="space-y-1 overflow-hidden">
+            <p className="text-sm font-semibold tracking-tight text-foreground">
+              {automa.title}
+            </p>
+            <p
+              className="text-xs text-muted-foreground leading-relaxed overflow-hidden"
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {automa.description}
+            </p>
+          </div>
+          <button
+            onClick={() => pauseAroundToggle(true)}
+            className="absolute top-3 right-3 inline-flex items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors px-3 py-3 shadow-md"
+            aria-label="Show controls"
+          >
+            <span className="material-symbols-outlined text-base leading-none">
+              expand_content
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

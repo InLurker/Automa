@@ -45,6 +45,7 @@ export interface AutomaComponentProps {
   values: Record<string, any>;
   width: number;
   height: number;
+  isPaused?: boolean;
 }
 
 // Message protocol types

@@ -17,37 +17,23 @@ if (!automa) {
 }
 ---
 
-<MainLayout title={`Automa · ${automa.title}`} mainClass="bg-background min-h-screen px-0">
+<MainLayout title={`Automa · ${automa.title}`} mainClass="bg-background min-h-screen px-0 flex flex-col">
   <section class="border-b border-border/60 bg-background/95 backdrop-blur">
     <div class="container flex h-16 items-center justify-between">
-      <div class="flex items-center gap-4">
-        <a
-          href="/"
-          class="text-sm font-semibold tracking-[0.25em] uppercase text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Automa
+      <div class="flex items-center gap-3 text-sm text-muted-foreground/80">
+        <a href="/explore" class="hover:text-foreground transition-colors">
+          Explore
         </a>
-        <div class="hidden md:flex items-center gap-3 text-sm text-muted-foreground/80">
-          <a href="/explore" class="hover:text-foreground transition-colors">Explore</a>
-          <span>/</span>
-          <span class="text-foreground font-medium">{automa.title}</span>
-        </div>
+        <span>/</span>
+        <span class="text-foreground font-medium">{automa.title}</span>
       </div>
-      <div class="flex items-center gap-2">
-        <a
-          href="/explore"
-          class="hidden sm:inline-flex items-center text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Back to Explore
-        </a>
-        <div class="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-          {automa.theme}
-        </div>
+      <div class="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+        {automa.theme}
       </div>
     </div>
   </section>
 
-  <section class="min-h-[calc(100vh-4rem)] flex">
+  <section class="flex flex-1 min-h-[calc(100vh-4rem)]">
     <AutomaLayout automa={JSON.parse(JSON.stringify(automa))} client:load />
   </section>
 </MainLayout>

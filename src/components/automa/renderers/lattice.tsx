@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { AutomaComponentProps } from "@/types/automa";
 
-export function LatticeAutoma({ values, width, height }: AutomaComponentProps) {
+export function LatticeAutoma({ values, width, height, isPaused }: AutomaComponentProps & { isPaused?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timeRef = useRef(0);
   const animationRef = useRef<number>();
@@ -15,6 +15,11 @@ export function LatticeAutoma({ values, width, height }: AutomaComponentProps) {
 
     canvas.width = width;
     canvas.height = height;
+
+    if (isPaused) {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      return;
+    }
 
     const animate = () => {
       timeRef.current += 0.01 * values.pulseSpeed;
@@ -76,7 +81,7 @@ export function LatticeAutoma({ values, width, height }: AutomaComponentProps) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [values, width, height]);
+  }, [values, width, height, isPaused]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
