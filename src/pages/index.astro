@@ -1,23 +1,27 @@
 ---
-import ExampleGrid from "@/components/example-grid.astro";
 import PageHeader from "@/components/page-header.astro";
-import { navMenuConfig } from "@/config/nav-menu";
 import MainLayout from "@/layouts/main-layout.astro";
-
-const examples = navMenuConfig.examplesNav[0].items;
-const pages = navMenuConfig.pagesNav[0].items;
 ---
 
 <MainLayout title="">
-  <div class="bg-background-200">
-    <section class="container py-12">
+  <div class="bg-background min-h-screen flex items-center justify-center">
+    <section class="container py-12 text-center">
       <PageHeader
-        heading="Discovery"
-        text="Differents pages and examples apps built with Astro v5, shadcn/ui & React 19, and Tailwind v4. Fully Open Source."
+        heading="Automa"
+        text="A minimalist zen playground for interactive animations"
       />
 
-      <ExampleGrid title="Pages" items={pages} />
-      <ExampleGrid title="Examples Apps" items={examples} />
+      <div class="mt-12">
+        <a
+          href="/explore"
+          class="inline-flex items-center justify-center rounded-md text-sm font-medium 
+                 ring-offset-background transition-all h-11 px-8 
+                 bg-foreground text-background hover:bg-foreground/90
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
+        >
+          Explore Automa
+        </a>
+      </div>
     </section>
   </div>
 </MainLayout>

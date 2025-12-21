@@ -1,0 +1,37 @@
+---
+import ExampleGrid from "@/components/example-grid.astro";
+import PageHeader from "@/components/page-header.astro";
+import MainLayout from "@/layouts/main-layout.astro";
+import { automaRegistry, getAllThemes } from "@/config/automa-registry";
+import type { MenuItem } from "@/types";
+
+// Convert automa to MenuItem format for ExampleGrid
+const themes = getAllThemes();
+const automaByTheme = themes.map((theme) => {
+  const items: MenuItem[] = automaRegistry
+    .filter((a) => a.theme === theme)
+    .map((automa) => ({
+      title: automa.title,
+      href: `/automa/${automa.slug}`,
+      description: automa.description,
+      image: `/images/examples/placeholder.jpg`, // Using placeholder for now
+    }));
+  
+  return { theme, items };
+});
+---
+
+<MainLayout title="Explore">
+  <div class="bg-background-200">
+    <section class="container py-12">
+      <PageHeader
+        heading="Explore"
+        text="Interactive animation modules. Click any tile to experience."
+      />
+
+      {automaByTheme.map(({ theme, items }) => (
+        <ExampleGrid title={theme} items={items} />
+      ))}
+    </section>
+  </div>
+</MainLayout>

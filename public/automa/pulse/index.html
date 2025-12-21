@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      overflow: hidden;
+      background: #0a0a0a;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let time = 0;
+    let params = {
+      rate: 1,
+      falloff: 0.8,
+      count: 8,
+      thickness: 3,
+      intensity: 0.7
+    };
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+
+    function drawPulse() {
+      ctx.clearRect(0, 0, width, height);
+      
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const maxRadius = Math.min(width, height) * 0.4;
+      
+      for (let i = 0; i < params.count; i++) {
+        const phase = (time * params.rate + i / params.count) % 1;
+        const radius = phase * maxRadius;
+        const alpha = params.intensity * Math.pow(1 - phase, params.falloff);
+        
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = params.thickness;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    function animate() {
+      time += 0.016; // ~60fps
+      drawPulse();
+      requestAnimationFrame(animate);
+    }
+
+    // Message handling
+    window.addEventListener('message', (event) => {
+      const { type, payload } = event.data;
+      
+      if (type === 'automa:init') {
+        params = { ...params, ...payload.values };
+        resize();
+        animate();
+        window.parent.postMessage({ type: 'automa:ready' }, '*');
+      } else if (type === 'automa:update') {
+        params = { ...params, ...payload.partialValues };
+      } else if (type === 'automa:rebuild') {
+        params = { ...params, ...payload.values };
+      }
+    });
+
+    window.addEventListener('resize', resize);
+    
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Could pause animation here
+      }
+    });
+  </script>
+</body>
+</html>

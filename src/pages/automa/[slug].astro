@@ -1,0 +1,53 @@
+---
+import { getAutomaBySlug, automaRegistry } from "@/config/automa-registry";
+import { AutomaLayout } from "@/components/automa/automa-layout";
+import MainLayout from "@/layouts/main-layout.astro";
+
+export async function getStaticPaths() {
+  return automaRegistry.map((automa) => ({
+    params: { slug: automa.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+const automa = getAutomaBySlug(slug);
+
+if (!automa) {
+  return Astro.redirect("/explore");
+}
+---
+
+<MainLayout title={`Automa · ${automa.title}`} mainClass="bg-background min-h-screen px-0">
+  <section class="border-b border-border/60 bg-background/95 backdrop-blur">
+    <div class="container flex h-16 items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a
+          href="/"
+          class="text-sm font-semibold tracking-[0.25em] uppercase text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Automa
+        </a>
+        <div class="hidden md:flex items-center gap-3 text-sm text-muted-foreground/80">
+          <a href="/explore" class="hover:text-foreground transition-colors">Explore</a>
+          <span>/</span>
+          <span class="text-foreground font-medium">{automa.title}</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a
+          href="/explore"
+          class="hidden sm:inline-flex items-center text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Back to Explore
+        </a>
+        <div class="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+          {automa.theme}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="min-h-[calc(100vh-4rem)] flex">
+    <AutomaLayout automa={JSON.parse(JSON.stringify(automa))} client:load />
+  </section>
+</MainLayout>

@@ -1,123 +1,130 @@
-# Astro-nomy (Static Version)
+# Automa
 
-A **fully static** fork of the original [Astronomy](https://github.com/mickasmt/astro-nomy) project, converted to use **Astro v5**, **React 19**, and **Tailwind CSS v4** without any backend dependencies.
+A minimalist zen playground for interactive animations built with **Astro v5**, **React 19**, and **Tailwind CSS v4**.
 
-This project demonstrates modern static site development with the latest versions of these powerful technologies.
+![Automa](public/og.jpg)
 
-![blog](public/og.jpg)
+## About
 
-> **Note**
-> This is a static version of the original project by [@miickasmt](https://twitter.com/miickasmt), upgraded to Astro v5, React 19, and Tailwind CSS v4, with all backend features removed for pure static site generation.
+Automa is a high-contrast, minimalist static site showcasing self-contained interactive animation modules. Each automa is a unique visual experience with real-time parameter controls.
 
-## About this project
+### Features
 
-This static version demonstrates:
+- ✨ **Schema-driven controls** - Define parameters once, get UI automatically
+- 🎨 **Three themes** - Flow, Structure, and Rhythm
+- 🎯 **Reusable components** - Shared control library across all automa
+- 🔒 **Iframe isolation** - Each automa runs independently
+- ⚡ **Real-time updates** - Live parameter changes via postMessage
+- 🌙 **Dark zen aesthetic** - High contrast minimalist design
+- 📱 **Fully responsive** - Works on all screen sizes
+- 🚀 **100% static** - No backend required
 
-- **Astro v5** - Latest version configured for static site generation
-- **React 19** - With the new React compiler for interactive components
-- **Tailwind CSS v4** - Latest version with improved developer experience
-- **No Backend** - Pure static site with no server-side dependencies
+## Current Automa
 
-The original project included authentication, subscriptions, and API routes. This version has been converted to a fully static site that can be deployed anywhere without backend infrastructure.
+### Flow Theme
+- **Drift** - Calm drifting particles with gentle directional flow
 
-See [STATIC_CONVERSION.md](./STATIC_CONVERSION.md) for details on what was changed.
+### Structure Theme
+- **Lattice** - A geometric lattice that subtly breathes and deforms
 
-## Project Structure
+### Rhythm Theme
+- **Pulse** - Concentric rings that pulse rhythmically with falloff
 
-```
-├── public/
-│   └── fonts/
-├── src/
-│   ├── components/
-│   ├── config/
-│   ├── content/
-│   ├── hooks/
-│   ├── icons/
-│   ├── layouts/
-│   ├── lib/
-│   ├── pages/
-│   ├── styles/
-│   └── types/
-├── astro.config.mjs
-├── README.md
-├── package.json
-├── tailwind.config.cjs
-└── tsconfig.json
+## Quick Start
+
+### Installation
+
+```bash
+npm install
 ```
 
-## Features
+### Development
 
-- ✅ **Astro v5** - Static site generation
-- ✅ **React 19** - Interactive UI components
-- ✅ **Tailwind CSS v4** - Modern styling
-- ✅ **View Transitions** - Smooth page navigation
-- ✅ **React Components & Hooks** - Interactive features
-- ✅ **UI Components** - Built using **shadcn/ui**
-- ✅ **Documentation & Blog** - Using **MDX** and **Content Collections**
-- ✅ **TypeScript** - Fully typed
-- ✅ **100/100 Lighthouse** - Perfect performance score
-- ✅ **RSS Feed** - Automatic feed generation
-- ✅ **Sitemap** - SEO-friendly sitemap
-- ✅ **Responsive Design** - Mobile-first approach
-- ✅ **Dark Mode** - Theme toggle support
+```bash
+npm run dev
+```
 
-### Removed Features (Static Version)
-- ❌ Authentication (Supabase)
-- ❌ Database operations
-- ❌ Email notifications (Resend)
-- ❌ API endpoints
-- ❌ Server-side rendering
-- ❌ Form submissions
+Visit `http://localhost:4321/explore` to see all automa.
 
-All form pages now show disabled demo versions with clear messaging.
+### Build
 
-## Deployment
-
-This is a fully static site and can be deployed to any static hosting service:
-
-- **Vercel** (recommended)
-- **Netlify**
-- **Cloudflare Pages**
-- **GitHub Pages**
-- **AWS S3 + CloudFront**
-- Any other static file hosting
-
-### Build for Production
-
-```sh
+```bash
 npm run build
 ```
 
 Static files will be generated in the `dist/` directory.
 
-### Preview Production Build
+### Preview
 
-```sh
+```bash
 npm run preview
 ```
 
-## Running Locally
+## Project Structure
 
-1. Install dependencies:
+```
+src/
+├── components/
+│   └── automa/              # Control UI components
+├── config/
+│   └── automa-registry.ts   # Automa definitions
+├── pages/
+│   ├── explore.astro        # Discovery page
+│   └── automa/[slug].astro  # Dynamic automa viewer
+└── types/
+    └── automa.ts            # TypeScript definitions
 
-```sh
-npm install
+public/
+└── automa/
+    ├── drift/               # Drift automa implementation
+    ├── lattice/             # Lattice automa implementation
+    └── pulse/               # Pulse automa implementation
 ```
 
-2. Start the development server:
+## Adding New Automa
 
-```sh
-npm run dev
-```
+See [AUTOMA_SYSTEM.md](./AUTOMA_SYSTEM.md) for detailed documentation on:
 
-No environment variables or backend setup required! This is a fully static site.
+- Architecture overview
+- Parameter schema system
+- PostMessage protocol
+- Step-by-step guide to adding new automa
+- Best practices
 
-## Credit
+### Quick Example
 
-- Original project [Astronomy](https://github.com/mickasmt/astro-nomy) by [@miickasmt](https://twitter.com/miickasmt)
-- Upgraded to Astro v5, React 19, and Tailwind CSS v4
-- The original theme was based off of the example app [Taxonomy](https://tx.shadcn.com/) by shadcn
+1. Add entry to `src/config/automa-registry.ts`
+2. Create HTML file in `public/automa/[name]/index.html`
+3. Implement animation with postMessage handling
+4. Build and test
+
+## Technology Stack
+
+- **Astro v5** - Static site generation
+- **React 19** - Interactive UI components
+- **Tailwind CSS v4** - Styling
+- **TypeScript** - Type safety
+- **shadcn/ui** - UI component library
+
+## Deployment
+
+Deploy to any static hosting service:
+
+- Vercel (recommended)
+- Netlify
+- Cloudflare Pages
+- GitHub Pages
+- AWS S3 + CloudFront
+
+## Documentation
+
+- [Automa System](./AUTOMA_SYSTEM.md) - Complete system documentation
+- [Static Conversion](./STATIC_CONVERSION.md) - Migration from original template
 
 ## License
 
-Licensed under the [MIT license](https://github.com/mickasmt/astro-nomy/blob/main/LICENSE.md).
+Licensed under the [MIT license](./LICENCE.md).
+
+## Credits
+
+Built on the [Astro Nomy](https://github.com/mickasmt/astro-nomy) template by [@miickasmt](https://twitter.com/miickasmt), upgraded to Astro v5, React 19, and Tailwind CSS v4 by [Dustin Turner](https://github.com/dustinturner).

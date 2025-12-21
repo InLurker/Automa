@@ -1,0 +1,64 @@
+---
+import { DriftAutoma } from "@/components/automa/renderers/drift";
+
+const testValues = {
+  density: 200,
+  speed: 1,
+  direction: 45,
+  noise: 30,
+  size: 2,
+  intensity: 0.7,
+};
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Automa</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #0a0a0a;
+        color: #fafafa;
+      }
+      .container {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+      }
+      .debug {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 1000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="debug">
+      <div>Test Automa - Drift</div>
+      <div id="status">Loading...</div>
+    </div>
+    <div class="container">
+      <DriftAutoma 
+        values={testValues}
+        width={typeof window !== 'undefined' ? window.innerWidth : 800}
+        height={typeof window !== 'undefined' ? window.innerHeight : 600}
+        client:load 
+      />
+    </div>
+    <script>
+      document.getElementById('status').textContent = 'Mounted';
+      console.log('Test page loaded');
+    </script>
+  </body>
+</html>

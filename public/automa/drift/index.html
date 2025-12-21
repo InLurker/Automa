@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drift</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      overflow: hidden;
+      background: #0a0a0a;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let particles = [];
+    let params = {
+      density: 200,
+      speed: 1,
+      direction: 45,
+      noise: 30,
+      size: 2,
+      intensity: 0.7
+    };
+
+    class Particle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.vx = 0;
+        this.vy = 0;
+        this.life = Math.random();
+      }
+
+      update() {
+        const dirRad = (params.direction * Math.PI) / 180;
+        const noiseAmount = params.noise / 100;
+        
+        this.vx = Math.cos(dirRad) * params.speed + (Math.random() - 0.5) * noiseAmount * 2;
+        this.vy = Math.sin(dirRad) * params.speed + (Math.random() - 0.5) * noiseAmount * 2;
+        
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        this.life += 0.001;
+        
+        if (this.x < 0 || this.x > width || this.y < 0 || this.y > height || this.life > 1) {
+          this.reset();
+        }
+      }
+
+      draw() {
+        const alpha = params.intensity * (1 - this.life);
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, params.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < params.density; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function animate() {
+      ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
+      ctx.fillRect(0, 0, width, height);
+      
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      
+      requestAnimationFrame(animate);
+    }
+
+    // Message handling
+    window.addEventListener('message', (event) => {
+      const { type, payload } = event.data;
+      
+      if (type === 'automa:init') {
+        params = { ...params, ...payload.values };
+        resize();
+        initParticles();
+        animate();
+        window.parent.postMessage({ type: 'automa:ready' }, '*');
+      } else if (type === 'automa:update') {
+        params = { ...params, ...payload.partialValues };
+      } else if (type === 'automa:rebuild') {
+        params = { ...params, ...payload.values };
+        initParticles();
+      }
+    });
+
+    window.addEventListener('resize', resize);
+    
+    // Pause when hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Could pause animation here
+      }
+    });
+  </script>
+</body>
+</html>

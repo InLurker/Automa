@@ -1,9 +1,9 @@
 import type { SidebarNavItem, SiteConfig } from "@/types";
 
 export const siteConfig: SiteConfig = {
-  name: "Astronomy",
+  name: "Automa",
   description:
-    "An modern example app built using Astro v5 & shadcn/ui. Inspired by shadcn/taxonomy.",
+    "A minimalist zen playground for interactive animations. Built with Astro v5 & shadcn/ui.",
   url: "https://astro-nomy-updated.vercel.app",
   ogImage: "https://astro-nomy-updated.vercel.app/og.jpg",
   links: {
@@ -14,30 +14,28 @@ export const siteConfig: SiteConfig = {
 
 export const footerLinks: SidebarNavItem[] = [
   {
-    title: "Company",
+    title: "Explore",
     items: [
-      { title: "About", href: "#" },
-      { title: "Enterprise", href: "#" },
-      { title: "Partners", href: "#" },
-      { title: "Jobs", href: "#" },
+      { title: "All Automa", href: "/explore" },
+      { title: "Flow", href: "/explore#flow" },
+      { title: "Structure", href: "/explore#structure" },
+      { title: "Rhythm", href: "/explore#rhythm" },
     ],
   },
   {
-    title: "Product",
+    title: "Resources",
     items: [
-      { title: "Security", href: "#" },
-      { title: "Customization", href: "#" },
-      { title: "Customers", href: "#" },
-      { title: "Changelog", href: "#" },
+      { title: "Blog", href: "/blog" },
+      { title: "Documentation", href: "/docs/getting-started" },
+      { title: "Guides", href: "/guides" },
     ],
   },
   {
-    title: "Docs",
+    title: "Automa",
     items: [
-      { title: "Introduction", href: "#" },
-      { title: "Installation", href: "#" },
-      { title: "Components", href: "#" },
-      { title: "Code Blocks", href: "#" },
+      { title: "Drift", href: "/automa/drift" },
+      { title: "Lattice", href: "/automa/lattice" },
+      { title: "Pulse", href: "/automa/pulse" },
     ],
   },
 ];

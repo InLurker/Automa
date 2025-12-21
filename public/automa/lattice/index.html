@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lattice</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      overflow: hidden;
+      background: #0a0a0a;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let time = 0;
+    let params = {
+      spacing: 50,
+      deformation: 15,
+      pulseSpeed: 1,
+      thickness: 1.5,
+      intensity: 0.6
+    };
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+
+    function drawLattice() {
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${params.intensity})`;
+      ctx.lineWidth = params.thickness;
+      
+      const cols = Math.ceil(width / params.spacing) + 1;
+      const rows = Math.ceil(height / params.spacing) + 1;
+      
+      // Draw vertical lines
+      for (let i = 0; i < cols; i++) {
+        ctx.beginPath();
+        for (let j = 0; j < rows; j++) {
+          const x = i * params.spacing;
+          const y = j * params.spacing;
+          
+          const wave = Math.sin(time + i * 0.5 + j * 0.3) * params.deformation;
+          const offsetX = x + wave;
+          const offsetY = y + Math.cos(time + i * 0.3 + j * 0.5) * params.deformation;
+          
+          if (j === 0) {
+            ctx.moveTo(offsetX, offsetY);
+          } else {
+            ctx.lineTo(offsetX, offsetY);
+          }
+        }
+        ctx.stroke();
+      }
+      
+      // Draw horizontal lines
+      for (let j = 0; j < rows; j++) {
+        ctx.beginPath();
+        for (let i = 0; i < cols; i++) {
+          const x = i * params.spacing;
+          const y = j * params.spacing;
+          
+          const wave = Math.sin(time + i * 0.5 + j * 0.3) * params.deformation;
+          const offsetX = x + wave;
+          const offsetY = y + Math.cos(time + i * 0.3 + j * 0.5) * params.deformation;
+          
+          if (i === 0) {
+            ctx.moveTo(offsetX, offsetY);
+          } else {
+            ctx.lineTo(offsetX, offsetY);
+          }
+        }
+        ctx.stroke();
+      }
+    }
+
+    function animate() {
+      time += 0.01 * params.pulseSpeed;
+      drawLattice();
+      requestAnimationFrame(animate);
+    }
+
+    // Message handling
+    window.addEventListener('message', (event) => {
+      const { type, payload } = event.data;
+      
+      if (type === 'automa:init') {
+        params = { ...params, ...payload.values };
+        resize();
+        animate();
+        window.parent.postMessage({ type: 'automa:ready' }, '*');
+      } else if (type === 'automa:update') {
+        params = { ...params, ...payload.partialValues };
+      } else if (type === 'automa:rebuild') {
+        params = { ...params, ...payload.values };
+      }
+    });
+
+    window.addEventListener('resize', resize);
+    
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Could pause animation here
+      }
+    });
+  </script>
+</body>
+</html>
