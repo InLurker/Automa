@@ -16,9 +16,13 @@ const automaByTheme = themes.map((theme) => {
       description: automa.description,
       image: `/images/examples/placeholder.jpg`, // Using placeholder for now
     }));
-  
+
   return { theme, items };
 });
+
+const typographyTheme = automaByTheme.find((entry) => entry.theme === "Typography");
+const classicThemes = automaByTheme.filter((entry) => entry.theme !== "Typography");
+
 ---
 
 <MainLayout title="Explore">
@@ -29,9 +33,35 @@ const automaByTheme = themes.map((theme) => {
         text="Interactive animation modules. Click any tile to experience."
       />
 
-      {automaByTheme.map(({ theme, items }) => (
-        <ExampleGrid title={theme} items={items} />
-      ))}
+      {
+        typographyTheme && (
+          <div class="mt-12 space-y-4">
+            <p class="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+              Typography Lab automa reuse the same control stack as the classic explorations. Launch
+              any tile to tweak parameters with the collapsible panel while the animation runs in
+              situ.
+            </p>
+            <ExampleGrid title="Typography Lab" items={typographyTheme.items} />
+          </div>
+        )
+      }
+
+      <div class="mt-12 space-y-6">
+        <div class="space-y-2">
+          <p class="text-xs uppercase tracking-[0.3em] text-muted-foreground">Classic</p>
+          <h2 class="text-2xl font-heading tracking-tight text-foreground">Core Templates</h2>
+          <p class="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+            Select a foundational automa to use as a starting point for production work.
+          </p>
+        </div>
+
+        <div class="space-y-4">
+          {classicThemes.map(({ theme, items }) => (
+            <ExampleGrid title={theme} items={items} />
+          ))}
+        </div>
+      </div>
+
     </section>
   </div>
 </MainLayout>

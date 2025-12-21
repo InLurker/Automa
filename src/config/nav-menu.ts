@@ -38,6 +38,12 @@ export const navMenuConfig: NavMenuConfig = {
           image: "/images/examples/about.jpg",
         },
         {
+          title: "Typography",
+          href: "/typography",
+          description: "Experimental text walls and shader typography demos.",
+          image: "/images/examples/documentation.jpg",
+        },
+        {
           title: "Newsletter",
           href: "/newsletter",
           description:

@@ -1,0 +1,63 @@
+---
+import MainLayout from "@/layouts/main-layout.astro";
+
+const demos = [
+  {
+    title: "Matrix Trails",
+    description: "Dense rain of multilingual glyphs with mask-driven highlights.",
+    href: "/typography/matrix.html",
+  },
+  {
+    title: "Shimmer Wall",
+    description: "Rasterized word art with controllable shimmer gradients.",
+    href: "/typography/shimmer.html",
+  },
+  {
+    title: "Sweep Highlight",
+    description: "Light-sweep animation across a character wall.",
+    href: "/typography/sweep.html",
+  },
+];
+---
+
+<MainLayout
+  title="Typography"
+  description="High-contrast typography experiments rendered on the canvas wall engine."
+  mainClass="bg-background"
+>
+  <section class="container py-12 space-y-8">
+    <div class="space-y-3">
+      <p class="text-xs uppercase tracking-[0.3em] text-muted-foreground">Typography Lab</p>
+      <h1 class="text-3xl font-heading tracking-tight text-foreground">Experimental Walls</h1>
+      <p class="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+        These demos run outside the Astro render tree to avoid interfering with the main UI. Each
+        opens in a standalone tab so you can tweak the parameters without affecting the control
+        surface.
+      </p>
+    </div>
+
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {demos.map((demo) => (
+        <a
+          href={demo.href}
+          target="_blank"
+          rel="noreferrer"
+          class="group rounded-2xl border border-border/50 bg-card/60 backdrop-blur-sm p-5 flex flex-col gap-3 shadow-[0_20px_50px_rgba(0,0,0,0.25)] transition hover:border-border hover:-translate-y-1"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-lg font-semibold tracking-tight text-foreground">{demo.title}</p>
+            <span class="material-symbols-outlined text-base text-muted-foreground">
+              open_in_new
+            </span>
+          </div>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            {demo.description}
+          </p>
+          <div class="mt-auto text-xs uppercase tracking-[0.3em] text-muted-foreground/70">
+            Launch Demo
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+</MainLayout>

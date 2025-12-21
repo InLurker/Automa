@@ -1,8 +1,8 @@
 // Automa type definitions
 
-export type AutomaTheme = "Flow" | "Structure" | "Rhythm";
+export type AutomaTheme = "Flow" | "Structure" | "Rhythm" | "Typography";
 
-export type ParameterType = "slider" | "number" | "select" | "toggle" | "text" | "color";
+export type ParameterType = "slider" | "number" | "select" | "toggle" | "text" | "color" | "gradient";
 
 export type ParameterGroup = "Motion" | "Geometry" | "Appearance" | "Timing";
 
@@ -23,6 +23,10 @@ export interface Parameter {
   options?: ParameterOption[];
   placeholder?: string;
   unit?: string;
+  visibleWhen?: {
+    key: string;
+    value: any;
+  };
 }
 
 export interface AutomaRegistry {

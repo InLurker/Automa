@@ -6,6 +6,7 @@ import { ControlToggle } from "./control-toggle";
 import { ControlSelect } from "./control-select";
 import { ControlText } from "./control-text";
 import { ControlColor } from "./control-color";
+import { ControlGradient } from "./control-gradient";
 import { ControlSection } from "./control-section";
 
 interface ControlsPanelProps {
@@ -32,6 +33,14 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
   };
 
   const renderControl = (param: Parameter) => {
+    // Check visibility condition
+    if (param.visibleWhen) {
+      const conditionValue = values[param.visibleWhen.key];
+      if (conditionValue !== param.visibleWhen.value) {
+        return null;
+      }
+    }
+
     const value = values[param.key];
     let control: React.ReactNode = null;
 
@@ -90,6 +99,15 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
           />
         );
         break;
+      case "gradient":
+        control = (
+          <ControlGradient
+            parameter={param}
+            value={value}
+            onChange={(v) => handleChange(param.key, v, param.live)}
+          />
+        );
+        break;
       default:
         control = null;
     }
@@ -107,14 +125,14 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-border/40 scrollbar-track-transparent">
+    <div className="h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-border/40 scrollbar-track-transparent">
       <div className="px-6 pt-4 pb-2">
         <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
           Control
         </p>
       </div>
 
-      <div className="px-6 pb-6 space-y-3">
+      <div className="px-6 pb-8 space-y-3">
         {(Object.keys(groupedParams) as ParameterGroup[]).map((group) => (
           <ControlSection key={group} title={group}>
             <div className="space-y-3">{groupedParams[group].map((param) => renderControl(param))}</div>

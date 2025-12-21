@@ -3,6 +3,9 @@ import type { AutomaRegistry } from "@/types/automa";
 import { DriftAutoma } from "./renderers/drift";
 import { LatticeAutoma } from "./renderers/lattice";
 import { PulseAutoma } from "./renderers/pulse";
+import { MatrixTrailsAutoma } from "./renderers/matrix-trails";
+import { ShimmerWallAutoma } from "./renderers/shimmer-wall";
+import { SweepHighlightAutoma } from "./renderers/sweep-highlight";
 
 interface AutomaComponentViewerProps {
   automa: AutomaRegistry;
@@ -55,6 +58,12 @@ export function AutomaComponentViewer({ automa, values, isPaused = false }: Auto
         return <LatticeAutoma {...props} />;
       case "pulse":
         return <PulseAutoma {...props} />;
+      case "matrix-trails":
+        return <MatrixTrailsAutoma {...props} />;
+      case "shimmer-wall":
+        return <ShimmerWallAutoma {...props} />;
+      case "sweep-highlight":
+        return <SweepHighlightAutoma {...props} />;
       default:
         return <div className="text-muted-foreground">Unknown automa type</div>;
     }
@@ -64,7 +73,6 @@ export function AutomaComponentViewer({ automa, values, isPaused = false }: Auto
     <div
       ref={containerRef}
       className="relative w-full h-full bg-background flex items-center justify-center"
-      style={{ minHeight: "calc(100vh - 4rem)" }}
     >
       {renderAutoma()}
       {isPaused && (

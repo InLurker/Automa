@@ -40,10 +40,10 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
   };
 
   return (
-    <div className="relative flex flex-1 min-h-[calc(100vh-4rem)] w-full overflow-hidden bg-background text-foreground">
+    <div className="relative flex flex-1 h-[80vh] w-full overflow-hidden bg-background text-foreground">
       {showControls && (
-        <aside className="relative w-[360px] border-r border-border/30 bg-background/85 backdrop-blur flex flex-col">
-          <div className="px-6 py-5 border-b border-border/30">
+        <aside className="relative w-[360px] h-full border-r border-border/30 bg-background/85 backdrop-blur flex flex-col">
+          <div className="flex-shrink-0 px-6 py-5 border-b border-border/30">
             <div className="space-y-1 pr-9">
               <h2 className="text-base font-semibold tracking-tight text-foreground">{automa.title}</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">{automa.description}</p>
@@ -59,12 +59,14 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
             </button>
           </div>
 
-          <ControlsPanel automa={automa} onValuesChange={handleValuesChange} />
+          <div className="flex-1 overflow-hidden">
+            <ControlsPanel automa={automa} onValuesChange={handleValuesChange} />
+          </div>
         </aside>
       )}
 
-      <section className="flex-1 bg-background">
-        <div className="w-full h-full min-h-[calc(100vh-4rem)] overflow-hidden">
+      <section className="flex-1 h-full bg-background">
+        <div className="w-full h-full overflow-hidden">
         {automa.renderer.type === "component" ? (
           <AutomaComponentViewer automa={automa} values={values} isPaused={animationPaused} />
         ) : (

@@ -50,10 +50,7 @@ export function AutomaViewer({ automa, values, isLive, isPaused = false }: Autom
   }, [values, isLive, isReady]);
 
   return (
-    <div
-      className="relative w-full h-full bg-background"
-      style={{ minHeight: "calc(100vh - 4rem)" }}
-    >
+    <div className="relative w-full h-full bg-background">
       <iframe
         ref={iframeRef}
         src={automa.renderer.path}
