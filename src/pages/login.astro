@@ -1,22 +1,7 @@
 ---
-import { LoginForm } from "@/components/login-form";
 import { buttonVariants } from "@/components/ui/button";
 import AuthLayout from "@/layouts/auth-layout.astro";
 import { cn } from "@/lib/utils";
-import { createServerClient } from "@/lib/supabase";
-
-// Check if user is already logged in
-const supabase = createServerClient(Astro.request, new Response());
-const { data: { session } } = await supabase.auth.getSession();
-
-// If user is already logged in, redirect to dashboard
-if (session) {
-  return Astro.redirect('/dashboard');
-}
-
-// Get error message from URL if any
-const url = new URL(Astro.request.url);
-const errorMessage = url.searchParams.get('error');
 ---
 
 <AuthLayout title="Login" description="Sign in to your account">
@@ -32,16 +17,50 @@ const errorMessage = url.searchParams.get('error');
     <div class="flex flex-col space-y-2 text-center">
       <h1 class="text-2xl font-semibold tracking-tight">Welcome back!</h1>
       <p class="text-sm text-muted-foreground">
-        Sign in to your account to continue
+        This is a static demo page
       </p>
     </div>
 
-    {errorMessage && (
-      <div class="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-        {errorMessage}
-      </div>
-    )}
+    <div class="bg-muted/50 text-sm p-4 rounded-md text-center">
+      <p class="text-muted-foreground">
+        Authentication has been disabled in this static version.
+      </p>
+      <p class="text-muted-foreground mt-2">
+        Check out the <a href="/blog" class="underline">blog</a> instead!
+      </p>
+    </div>
 
-    <LoginForm client:load />
+    <div class="space-y-4">
+      <div class="space-y-2">
+        <label for="email" class="text-sm font-medium leading-none">
+          Email
+        </label>
+        <input
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          disabled
+          class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background opacity-50 cursor-not-allowed"
+        />
+      </div>
+      <div class="space-y-2">
+        <label for="password" class="text-sm font-medium leading-none">
+          Password
+        </label>
+        <input
+          id="password"
+          type="password"
+          placeholder="••••••••"
+          disabled
+          class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background opacity-50 cursor-not-allowed"
+        />
+      </div>
+      <button
+        disabled
+        class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors h-10 px-4 py-2 bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+      >
+        Sign In
+      </button>
+    </div>
   </div>
 </AuthLayout>

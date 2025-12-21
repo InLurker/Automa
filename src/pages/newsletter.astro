@@ -1,28 +1,11 @@
 ---
 import MainLayout from "@/layouts/main-layout.astro";
 import { Icon } from "astro-icon/components";
-import { NewsletterForm } from "@/components/forms/newsletter-form";
-import { createServerClient } from "@/lib/supabase";
-
-// Get the count of newsletter subscribers from Supabase
-let subscriberCount = 0;
-try {
-  const supabase = createServerClient(Astro.request, new Response());
-  const { count, error } = await supabase
-    .from('newsletter')
-    .select('*', { count: 'exact', head: true });
-  
-  if (!error && count !== null) {
-    subscriberCount = count;
-  }
-} catch (error) {
-  console.error('Error fetching subscriber count:', error);
-}
 ---
 
 <MainLayout
   title="Newsletter"
-  description="A waiting list page with form using Astro DB."
+  description="Subscribe to our newsletter for updates."
   mainClass="bg-background-200"
 >
   <div class="relative flex w-full min-h-svh items-center justify-center">
@@ -35,17 +18,36 @@ try {
           <h1 class="text-2xl font-heading tracking-wide">
             Subscribe to the newsletter
           </h1>
-          <p class="flex gap-2 text-sm text-muted-foreground">
-            <b>{subscriberCount} people</b> already joined the newsletter!
+          <p class="text-sm text-muted-foreground">
+            Stay updated with our latest news and updates about UX/UI and astronomy!
           </p>
           <p class="text-sm text-muted-foreground">
-            Fill out the form below to obtain a monthly summary of information
-            around UX/UI and astronomy!
+            This is a static demo page. Check out our <a href="/blog" class="underline">blog</a> instead!
           </p>
         </div>
 
-        <div class="w-full">
-          <NewsletterForm client:load />
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <label for="email" class="text-sm font-medium leading-none">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              disabled
+              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background opacity-50 cursor-not-allowed"
+            />
+            <p class="text-muted-foreground text-[13px]">
+              <i>Form disabled - this is a static site demo</i>
+            </p>
+          </div>
+          <button
+            disabled
+            class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors h-10 px-4 py-2 bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+          >
+            Subscribe
+          </button>
         </div>
       </div>
     </div>

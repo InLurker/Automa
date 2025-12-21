@@ -1,12 +1,11 @@
 ---
 import MainLayout from "@/layouts/main-layout.astro";
-import { WaitlistForm } from "@/components/forms/waitlist-form";
 import { Icon } from "astro-icon/components";
 ---
 
 <MainLayout
   title="Waitlist"
-  description="A waiting list page with form using Supabase."
+  description="Join our waitlist to get early access."
   mainClass="bg-background-200"
 >
   <div class="relative flex w-full min-h-svh items-center justify-center">
@@ -20,17 +19,37 @@ import { Icon } from "astro-icon/components";
           <p class="text-sm text-muted-foreground">
             Excited to join the waitlist?
           </p>
-          <p>
-            Fill out the form below to secure your spot and be the first to know
-            when we launch!
+          <p class="text-sm text-muted-foreground">
+            We're currently building something amazing. This is a static demo page.
           </p>
-          <p>
-            Check <a href="/newsletter" class="underline">here</a> for a form with
-            counter.
+          <p class="text-sm text-muted-foreground">
+            Check out our <a href="/blog" class="underline">blog</a> for updates!
           </p>
         </div>
 
-        <WaitlistForm client:load />
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <label for="email" class="text-sm font-medium leading-none">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              disabled
+              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background opacity-50 cursor-not-allowed"
+            />
+            <p class="text-muted-foreground text-[13px]">
+              <i>Form disabled - this is a static site demo</i>
+            </p>
+          </div>
+          <button
+            disabled
+            class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors h-10 px-4 py-2 bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+          >
+            Submit
+          </button>
+        </div>
       </div>
     </div>
   </div>

@@ -1,23 +1,26 @@
-# Astro-nomy
+# Astro-nomy (Static Version)
 
-A fork of the original [Astronomy](https://github.com/mickasmt/astro-nomy) project, upgraded to use **Astro v5**, **React 19**, and **Tailwind CSS v4**.
+A **fully static** fork of the original [Astronomy](https://github.com/mickasmt/astro-nomy) project, converted to use **Astro v5**, **React 19**, and **Tailwind CSS v4** without any backend dependencies.
 
-This project demonstrates modern web development with the latest versions of these powerful technologies.
+This project demonstrates modern static site development with the latest versions of these powerful technologies.
 
 ![blog](public/og.jpg)
 
 > **Note**
-> This is a fork of the original project by [@miickasmt](https://twitter.com/miickasmt), upgraded to use the latest versions of Astro (v5), React (v19), and Tailwind CSS (v4).
+> This is a static version of the original project by [@miickasmt](https://twitter.com/miickasmt), upgraded to Astro v5, React 19, and Tailwind CSS v4, with all backend features removed for pure static site generation.
 
 ## About this project
 
-This fork demonstrates how to upgrade the original Astronomy project to use the latest versions of:
+This static version demonstrates:
 
-- **Astro v5** - The latest version with improved performance and features
-- **React 19** - With the new React compiler and improved performance
-- **Tailwind CSS v4** - The latest version with improved developer experience
+- **Astro v5** - Latest version configured for static site generation
+- **React 19** - With the new React compiler for interactive components
+- **Tailwind CSS v4** - Latest version with improved developer experience
+- **No Backend** - Pure static site with no server-side dependencies
 
-The original project was an experiment to see how a modern app (with features like authentication, subscriptions, API routes, Markdown, Content Collections, etc.) would work in Astro v4 and shadcn/ui.
+The original project included authentication, subscriptions, and API routes. This version has been converted to a fully static site that can be deployed anywhere without backend infrastructure.
+
+See [STATIC_CONVERSION.md](./STATIC_CONVERSION.md) for details on what was changed.
 
 ## Project Structure
 
@@ -44,79 +47,70 @@ The original project was an experiment to see how a modern app (with features li
 
 ## Features
 
-- **Astro v5** with improved performance and features
-- **React 19** with the new React compiler
-- **Tailwind CSS v4** with the latest improvements
-- **Supabase** integration for authentication and database
-  - Server-side rendering (SSR) with cookie-based auth
-  - Client-side authentication
-  - Custom auth helper functions
-- **Resend** for sending transactional emails
-  - Newsletter subscription confirmation
-  - Waitlist signup confirmation
-- Config files
-- Views Transitions
-- Routing and Layouts
-- React components & hooks
-- UI Components built using **shadcn/ui**
-- Documentation and blog using **MDX** and **Content Collections**
-- Validations using **Zod**
-- Written in **TypeScript**
-- 100/100 Lighthouse performance
-- Minimal styling (make it your own!)
-- RSS Feed support
-- Sitemap support
-- Data Fetching
-- API Endpoint
+- ✅ **Astro v5** - Static site generation
+- ✅ **React 19** - Interactive UI components
+- ✅ **Tailwind CSS v4** - Modern styling
+- ✅ **View Transitions** - Smooth page navigation
+- ✅ **React Components & Hooks** - Interactive features
+- ✅ **UI Components** - Built using **shadcn/ui**
+- ✅ **Documentation & Blog** - Using **MDX** and **Content Collections**
+- ✅ **TypeScript** - Fully typed
+- ✅ **100/100 Lighthouse** - Perfect performance score
+- ✅ **RSS Feed** - Automatic feed generation
+- ✅ **Sitemap** - SEO-friendly sitemap
+- ✅ **Responsive Design** - Mobile-first approach
+- ✅ **Dark Mode** - Theme toggle support
 
-## Roadmap
+### Removed Features (Static Version)
+- ❌ Authentication (Supabase)
+- ❌ Database operations
+- ❌ Email notifications (Resend)
+- ❌ API endpoints
+- ❌ Server-side rendering
+- ❌ Form submissions
 
-- [x] ~Dark mode~
-- [x] ~Add Markdown & MDX support~
-- [x] ~Sheet mobile nav~
-- [x] ~Build **changelog pages**~
-- [x] ~Build **waitlist with React Hook Form & Supabase**~
-- [x] ~Build **newsletter with React Hook Form & Supabase**~
-- [x] ~Add **Supabase Auth & Database** integration~
-- [x] ~Build **auth/dashboard pages with Shadcn UI**~
-- [x] ~Implement **newsletter & waitlist with Resend API**~
-- [ ] Build **blog with Supabase** (work on it)
-- [ ] Build **ecommerce pages** (work on it)
-- [ ] Add search support for blog *(researching Pagefind vs Fuse.js options)*
-- [ ] Add OG image for blog and others
-- [ ] Add SEO component & metadata
-- [ ] Subscriptions using Stripe (or Lemon Squeezy?)
+All form pages now show disabled demo versions with clear messaging.
+
+## Deployment
+
+This is a fully static site and can be deployed to any static hosting service:
+
+- **Vercel** (recommended)
+- **Netlify**
+- **Cloudflare Pages**
+- **GitHub Pages**
+- **AWS S3 + CloudFront**
+- Any other static file hosting
+
+### Build for Production
+
+```sh
+npm run build
+```
+
+Static files will be generated in the `dist/` directory.
+
+### Preview Production Build
+
+```sh
+npm run preview
+```
 
 ## Running Locally
 
-1. Install dependencies using pnpm:
+1. Install dependencies:
 
 ```sh
-pnpm install
+npm install
 ```
 
-2. Copy the example environment file and update with your own values:
+2. Start the development server:
 
 ```sh
-cp .env.example .env
+npm run dev
 ```
 
-3. Update the following environment variables in the `.env` file:
-
-```
-# Supabase - Get these from your Supabase project settings
-PUBLIC_SUPABASE_URL=your-supabase-url
-PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# Resend - Get this from your Resend dashboard
-RESEND_API_KEY=your-resend-api-key
-```
-
-4. Start the development server:
-
-```sh
-pnpm run dev
-```
+No environment variables or backend setup required! This is a fully static site.
 
 ## Credit
 

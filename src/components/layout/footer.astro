@@ -1,5 +1,4 @@
 ---
-import { FooterNewsletterForm } from "@/components/forms/footer-newsletter-form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { footerLinks, siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -38,9 +37,14 @@ const { className } = Astro.props;
       ))
     }
     <div class="flex flex-col space-y-4 md:col-span-2">
-      <h3 class="text-sm font-medium text-foreground">Subscribe to our newsletter</h3>
-      <p class="text-sm text-muted-foreground">Get the latest updates and news delivered to your inbox.</p>
-      <FooterNewsletterForm client:idle />
+      <h3 class="text-sm font-medium text-foreground">Stay Connected</h3>
+      <p class="text-sm text-muted-foreground">Check out our blog for the latest updates and news.</p>
+      <a 
+        href="/blog" 
+        class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 w-fit"
+      >
+        Visit Blog
+      </a>
     </div>
   </div>
 
