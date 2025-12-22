@@ -40,7 +40,7 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
   };
 
   return (
-    <div className="relative flex flex-1 h-[80vh] w-full overflow-hidden bg-background text-foreground">
+    <div className="relative flex flex-1 w-full overflow-hidden bg-background text-foreground">
       {showControls && (
         <aside className="relative w-[360px] h-full border-r border-border/30 bg-background/85 backdrop-blur flex flex-col">
           <div className="flex-shrink-0 px-6 py-5 border-b border-border/30">
@@ -76,7 +76,7 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
       </section>
 
       {!showControls && (
-        <div className="absolute z-20 top-6 left-6 max-w-sm w-full border border-border/40 bg-background/85 backdrop-blur-lg shadow-2xl rounded-2xl p-4 pr-12">
+        <div className="absolute z-20 top-6 left-6 max-w-sm w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/20 dark:bg-white/5 backdrop-blur-2xl shadow-[0_25px_60px_rgba(0,0,0,0.35)] p-4 pr-12 transition-colors">
           <div className="space-y-1 overflow-hidden">
             <p className="text-sm font-semibold tracking-tight text-foreground">
               {automa.title}

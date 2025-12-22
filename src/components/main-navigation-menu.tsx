@@ -19,26 +19,11 @@ const pages = navMenuConfig.pagesNav[0];
 const examples = navMenuConfig.examplesNav[0];
 
 export function MainNavigationMenu() {
-  // Detect dark mode
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
-  
-  React.useEffect(() => {
-    // Check initial dark mode
-    setIsDarkMode(document.documentElement.classList.contains('dark'));
-    
-    // Watch for theme changes
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          setIsDarkMode(document.documentElement.classList.contains('dark'));
-        }
-      });
-    });
-    
-    observer.observe(document.documentElement, { attributes: true });
-    
-    return () => observer.disconnect();
-  }, []);
+  const panelStyles: React.CSSProperties = {
+    backgroundColor: "#171717",
+    borderColor: "#262626",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.35)",
+  };
   return (
     <NavigationMenu>
       <NavigationMenuList>
@@ -73,12 +58,8 @@ export function MainNavigationMenu() {
           <NavigationMenuTrigger>{pages.title}</NavigationMenuTrigger>
           <NavigationMenuContent>
             <ul 
-              className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]" 
-              style={{ 
-                backgroundColor: isDarkMode ? "#171717" : "#ffffff",
-                borderColor: isDarkMode ? "#262626" : "#e5e5e5",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)"
-              }}
+              className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] rounded-xl border"
+              style={panelStyles}
             >
               {pages.items?.map((page) => (
                 <ListItem key={page.title} {...page} />
@@ -91,12 +72,8 @@ export function MainNavigationMenu() {
           <NavigationMenuTrigger>{examples.title}</NavigationMenuTrigger>
           <NavigationMenuContent>
             <ul 
-              className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]" 
-              style={{ 
-                backgroundColor: isDarkMode ? "#171717" : "#ffffff",
-                borderColor: isDarkMode ? "#262626" : "#e5e5e5",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)"
-              }}
+              className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] rounded-xl border"
+              style={panelStyles}
             >
               {examples.items?.map((example) => (
                 <ListItem key={example.title} {...example} />

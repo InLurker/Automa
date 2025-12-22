@@ -295,6 +295,9 @@ export function ShimmerWallAutoma({
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
+      const wallSweepEnabled = values.wallSweep ?? false;
+      const wallSweepStrength = clamp(values.wallSweepStrength ?? 0.3, 0, 1);
+
       for (let r = 0; r < grid.rows; r++) {
         const y = grid.yCenter[r];
         if (y < -grid.cell || y > height + grid.cell) continue;
@@ -303,7 +306,22 @@ export function ShimmerWallAutoma({
           if (x < -grid.cell || x > width + grid.cell) continue;
           const i = r * grid.cols + c;
           const tw = 0.86 + 0.14 * Math.sin(grid.twPhase[i] + time * grid.twSpeed[i]);
-          ctx.fillStyle = hexToRgba(colors.text, bgB * tw);
+          
+          let brightness = bgB * tw;
+          
+          // Add sweep effect to wall if enabled
+          if (wallSweepEnabled) {
+            const rx = grid.cols > 1 ? c / denom : 0;
+            const left = center - halfW;
+            const u = (rx - left) / Math.max(1e-6, 2 * halfW);
+            const intensity = clamp(evalGradient(u, lockEnds), 0, 1);
+            // Use a reasonable max boost for wall (not the full peakB which is for highlight)
+            const maxWallBoost = clamp(0.15, 0, 0.5); // Cap wall sweep boost
+            const sweepBoost = maxWallBoost * intensity * wallSweepStrength;
+            brightness += sweepBoost;
+          }
+          
+          ctx.fillStyle = hexToRgba(colors.text, brightness);
           ctx.fillText(String.fromCodePoint(grid.chars[i]), x, y);
         }
       }
@@ -312,12 +330,6 @@ export function ShimmerWallAutoma({
       ctx.font = `700 ${fontPx}px "Times New Roman","Georgia","Times",serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-
-      // Follow-wall mode
-      if (baseB <= 0.0005 && values.followWall) {
-        const mul = clamp(values.followMul ?? 1, 0, 3);
-        baseB = clamp(bgB * mul, 0, 1);
-      }
 
       // Pass A: base text
       if (baseB > 0.0005) {
@@ -378,6 +390,8 @@ export function ShimmerWallAutoma({
       values.followWall,
       values.followMul,
       values.lockEnds,
+      values.wallSweep,
+      values.wallSweepStrength,
       colors,
       evalGradient,
     ]

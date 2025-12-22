@@ -1,5 +1,4 @@
 ---
-import { ThemeToggle } from "@/components/theme-toggle";
 import { footerLinks, siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import { Icon } from "astro-icon/components";
@@ -74,17 +73,14 @@ const { className } = Astro.props;
         </a>.
       </p>
 
-      <div class="flex items-center gap-3">
-        <a
-          href={siteConfig.links.github}
-          target="_blank"
-          rel="noreferrer"
-          class="font-medium underline underline-offset-4"
-        >
-          <Icon name="github" class="size-5" />
-        </a>
-        <ThemeToggle client:load />
-      </div>
+      <a
+        href={siteConfig.links.github}
+        target="_blank"
+        rel="noreferrer"
+        class="font-medium underline underline-offset-4"
+      >
+        <Icon name="github" class="size-5" />
+      </a>
     </div>
   </div>
 </footer>

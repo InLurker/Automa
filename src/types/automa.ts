@@ -27,6 +27,10 @@ export interface Parameter {
     key: string;
     value: any;
   };
+  inlineToggle?: {
+    key: string;
+    label: string;
+  };
 }
 
 export interface AutomaRegistry {

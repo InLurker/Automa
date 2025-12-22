@@ -8,7 +8,6 @@ import BaseLayout from "./base-layout.astro";
 import { SheetMobileNav } from "@/components/layout/sheet-mobile-nav";
 import { navMenuConfig } from "@/config/nav-menu";
 import { docsConfig } from "@/config/docs";
-import { ThemeToggle } from "@/components/theme-toggle";
 // import MainNav from "@/components/layout/main-nav.astro";
 
 type Props = {
@@ -59,8 +58,6 @@ const { title, description } = Astro.props;
       >
         <Icon name="github" class="size-[22px]" />
       </a>
-
-      <ThemeToggle client:load />
     </div>
   </Header>
 

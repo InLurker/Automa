@@ -13,7 +13,7 @@ Completed comprehensive audit and improvement of the Matrix Trails automa, addre
 - ✅ Multi-pass rendering (wall lift → outside trails → inside trails w/ glow → word overlay)
 - ✅ Dirty tracking + stripe-based twinkle repainting
 - ✅ Step-based simulation with MAX_STEPS_PER_FRAME cap
-- ✅ Hitbox mask rasterization
+- ✅ Highlight mask rasterization
 - ✅ All core algorithms match original
 
 ### What Was Missing → **NOW FIXED**
@@ -119,7 +119,7 @@ TRAIL EFFECTS (Appearance + Timing)
 ├─ Outside Fade Rate (0.50-0.98)
 ├─ Inside Fade Rate (0.50-0.995)
 ├─ Outside Trail Color [picker] ← NEW!
-└─ Hitbox Glow Radius (0-30px)
+└─ Highlight Glow Radius (0-30px)
 
 TEXT HIGHLIGHT (Appearance)
 ├─ Highlight Text (你好)

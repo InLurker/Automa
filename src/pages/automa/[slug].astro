@@ -17,8 +17,8 @@ if (!automa) {
 }
 ---
 
-<MainLayout title={`Automa · ${automa.title}`} mainClass="bg-background min-h-screen px-0 flex flex-col">
-  <section class="border-b border-border/60 bg-background/95 backdrop-blur">
+<MainLayout title={`Automa · ${automa.title}`} mainClass="bg-background h-screen px-0 flex flex-col overflow-hidden">
+  <section class="border-b border-border/60 bg-background/95 backdrop-blur flex-shrink-0">
     <div class="container flex h-16 items-center justify-between">
       <div class="flex items-center gap-3 text-sm text-muted-foreground/80">
         <a href="/explore" class="hover:text-foreground transition-colors">
@@ -33,7 +33,7 @@ if (!automa) {
     </div>
   </section>
 
-  <section class="flex flex-1 items-center justify-center py-8">
+  <section class="flex flex-1 overflow-hidden">
     <AutomaLayout automa={JSON.parse(JSON.stringify(automa))} client:load />
   </section>
 </MainLayout>

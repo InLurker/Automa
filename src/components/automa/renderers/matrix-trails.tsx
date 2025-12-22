@@ -52,7 +52,6 @@ export function MatrixTrailsAutoma({
   isPaused,
 }: AutomaComponentProps & { isPaused?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wallCanvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
   const maskCanvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
   const animationRef = useRef<number>();
 
@@ -74,11 +73,6 @@ export function MatrixTrailsAutoma({
     activeFlag: Uint8Array;
     dropPos: Float32Array;
     dropSpd: Float32Array;
-    dirtyFlag: Uint8Array;
-    dirtyCells: number[];
-    twRowCursor: number;
-    nextTwinkleAt: number;
-    forceFullWallPaint: boolean;
     fixedPool: Uint32Array;
     glyphCache: Map<number, string>;
   }>({
@@ -98,11 +92,6 @@ export function MatrixTrailsAutoma({
     activeFlag: new Uint8Array(0),
     dropPos: new Float32Array(0),
     dropSpd: new Float32Array(0),
-    dirtyFlag: new Uint8Array(0),
-    dirtyCells: [],
-    twRowCursor: 0,
-    nextTwinkleAt: 0,
-    forceFullWallPaint: true,
     fixedPool: new Uint32Array(0),
     glyphCache: new Map(),
   });
@@ -248,10 +237,6 @@ export function MatrixTrailsAutoma({
       canvas.height = ch;
     }
 
-    const wallCanvas = wallCanvasRef.current;
-    wallCanvas.width = cw;
-    wallCanvas.height = ch;
-
     maskCanvasRef.current.width = grid.cols;
     maskCanvasRef.current.height = grid.rows;
 
@@ -304,134 +289,9 @@ export function MatrixTrailsAutoma({
       }
     }
 
-    grid.dirtyFlag = new Uint8Array(total);
-    grid.dirtyCells = [];
-
     rasterizeHitMask(values.maskText || "你好", grid.cols, grid.rows);
-
-    grid.twRowCursor = 0;
-    grid.nextTwinkleAt = 0;
-    grid.forceFullWallPaint = true;
   }, [width, height, values.cellSize, values.fillMode, values.script, values.fixedText, values.maskText, rasterizeHitMask]);
 
-  // Twinkle factor
-  const twinkleFactor = useCallback((i: number, nowMs: number): number => {
-    const twFps = clamp(values.twinkleSpeed ?? 12, 0, 30);
-    if (twFps <= 0) return 1;
-    const grid = gridRef.current;
-    const t = nowMs * 0.001;
-    return 0.86 + 0.14 * Math.sin(grid.twPhase[i] + t * grid.twSpeed[i]);
-  }, [values.twinkleSpeed]);
-
-  // Mark dirty
-  const markDirty = useCallback((idx: number) => {
-    const grid = gridRef.current;
-    if (!grid.dirtyFlag[idx]) {
-      grid.dirtyFlag[idx] = 1;
-      grid.dirtyCells.push(idx);
-    }
-  }, []);
-
-  // Paint single cell on wall
-  const paintCellOnWall = useCallback(
-    (idx: number, nowMs: number) => {
-      const grid = gridRef.current;
-      const wallCanvas = wallCanvasRef.current;
-      const wallCtx = wallCanvas.getContext("2d");
-      if (!wallCtx) return;
-
-      const wallB = clamp(values.wallBrightness ?? 0.06, 0, 0.25);
-
-      const r = (idx / grid.cols) | 0;
-      const c = idx - r * grid.cols;
-
-      wallCtx.clearRect(c * grid.cell, r * grid.cell, grid.cell, grid.cell);
-
-      const tw = twinkleFactor(idx, nowMs);
-      const a = wallB * tw;
-
-      wallCtx.fillStyle = `rgba(255,255,255,${a.toFixed(4)})`;
-      wallCtx.fillText(glyph(grid.wallChars[idx]), grid.xCenter[c], grid.yCenter[r]);
-    },
-    [values.wallBrightness, twinkleFactor, glyph]
-  );
-
-  // Flush dirty cells
-  const flushDirtyCells = useCallback(
-    (nowMs: number) => {
-      const grid = gridRef.current;
-      if (!grid.dirtyCells.length) return;
-      for (let i = 0; i < grid.dirtyCells.length; i++) {
-        const idx = grid.dirtyCells[i];
-        grid.dirtyFlag[idx] = 0;
-        paintCellOnWall(idx, nowMs);
-      }
-      grid.dirtyCells.length = 0;
-    },
-    [paintCellOnWall]
-  );
-
-  // Paint wall rows (stripe)
-  const paintWallRows = useCallback(
-    (rStart: number, rCount: number, nowMs: number) => {
-      const grid = gridRef.current;
-      const wallCanvas = wallCanvasRef.current;
-      const wallCtx = wallCanvas.getContext("2d");
-      if (!wallCtx) return;
-
-      const wallB = clamp(values.wallBrightness ?? 0.06, 0, 0.25);
-      const rEnd = Math.min(grid.rows, rStart + rCount);
-
-      wallCtx.clearRect(0, rStart * grid.cell, width, (rEnd - rStart) * grid.cell);
-
-      for (let r = rStart; r < rEnd; r++) {
-        const y = grid.yCenter[r];
-        for (let c = 0; c < grid.cols; c++) {
-          const idx = r * grid.cols + c;
-          const tw = twinkleFactor(idx, nowMs);
-          const a = wallB * tw;
-          wallCtx.fillStyle = `rgba(255,255,255,${a.toFixed(4)})`;
-          wallCtx.fillText(glyph(grid.wallChars[idx]), grid.xCenter[c], y);
-        }
-      }
-    },
-    [width, values.wallBrightness, twinkleFactor, glyph]
-  );
-
-  // Paint full wall
-  const paintFullWall = useCallback(
-    (nowMs: number) => {
-      const grid = gridRef.current;
-      const wallCanvas = wallCanvasRef.current;
-      const wallCtx = wallCanvas.getContext("2d");
-      if (!wallCtx) return;
-
-      wallCtx.clearRect(0, 0, width, height);
-      paintWallRows(0, grid.rows, nowMs);
-    },
-    [width, height, paintWallRows]
-  );
-
-  // Maybe twinkle stripe
-  const maybeTwinkleStripe = useCallback(
-    (nowMs: number) => {
-      const grid = gridRef.current;
-      const twFps = clamp(values.twinkleSpeed ?? 12, 0, 30);
-      if (twFps <= 0) return;
-
-      const interval = 1000 / twFps;
-      if (nowMs < grid.nextTwinkleAt) return;
-      grid.nextTwinkleAt = nowMs + interval;
-
-      const cellsBudget = 2000;
-      const stripeRows = Math.max(1, Math.floor(cellsBudget / Math.max(1, grid.cols)));
-
-      paintWallRows(grid.twRowCursor, stripeRows, nowMs);
-      grid.twRowCursor += stripeRows;
-      if (grid.twRowCursor >= grid.rows) grid.twRowCursor = 0;
-    },
-    [values.twinkleSpeed, paintWallRows]
-  );
 
   // Add active
   const addActive = useCallback((idx: number) => {
@@ -462,7 +322,6 @@ export function MatrixTrailsAutoma({
 
         if (isFixed && grid.wallChars[idx] !== grid.baseChars[idx]) {
           grid.wallChars[idx] = grid.baseChars[idx];
-          markDirty(idx);
         }
 
         grid.active[i] = grid.active[grid.active.length - 1];
@@ -490,7 +349,6 @@ export function MatrixTrailsAutoma({
         const cp = replacementCodepoint();
         if (grid.wallChars[idx] !== cp) {
           grid.wallChars[idx] = cp;
-          markDirty(idx);
         }
 
         const inj = grid.hitMask[idx] ? inStrength : outStrength;
@@ -514,7 +372,6 @@ export function MatrixTrailsAutoma({
     values.insideDecay,
     values.fillMode,
     replacementCodepoint,
-    markDirty,
     addActive,
   ]);
 
@@ -528,24 +385,10 @@ export function MatrixTrailsAutoma({
       if (!ctx) return;
 
       const grid = gridRef.current;
-      const wallCanvas = wallCanvasRef.current;
 
-      // Twinkle + dirty
-      if (grid.forceFullWallPaint) {
-        grid.forceFullWallPaint = false;
-        paintFullWall(nowMs);
-      } else {
-        maybeTwinkleStripe(nowMs);
-      }
-      flushDirtyCells(nowMs);
-
-      // Base wall
       const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(wallCanvas, 0, 0);
-
-      // Overlays
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.imageSmoothingEnabled = false;
 
@@ -553,9 +396,33 @@ export function MatrixTrailsAutoma({
       const monoFont = `${fontPx}px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Noto Sans Mono",monospace`;
       const serifFont = `700 ${fontPx}px "Times New Roman","Georgia","Times",serif`;
 
-      const lift = clamp(values.wallLift ?? 0.05, 0, 0.2);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
 
-      // PASS 1: Wall lift
+      const wallB = clamp(values.wallBrightness ?? 0.25, 0, 0.6);
+      const lift = clamp(values.wallLift ?? 0.05, 0, 0.2);
+      const time = nowMs * 0.001;
+
+      // PASS 1: Base wall with twinkle (monospace)
+      ctx.font = monoFont;
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = "transparent";
+
+      for (let r = 0; r < grid.rows; r++) {
+        const y = grid.yCenter[r];
+        if (y < -grid.cell || y > height + grid.cell) continue;
+        for (let c = 0; c < grid.cols; c++) {
+          const x = grid.xCenter[c];
+          if (x < -grid.cell || x > width + grid.cell) continue;
+          const i = r * grid.cols + c;
+          const tw = 0.86 + 0.14 * Math.sin(grid.twPhase[i] + time * grid.twSpeed[i]);
+          const a = wallB * tw;
+          ctx.fillStyle = hexToRgba(colors.outsideTrail, a);
+          ctx.fillText(glyph(grid.wallChars[i]), x, y);
+        }
+      }
+
+      // PASS 2: Wall lift (monospace, on active cells)
       if (lift > 0.0005) {
         ctx.font = monoFont;
         ctx.shadowBlur = 0;
@@ -576,7 +443,7 @@ export function MatrixTrailsAutoma({
         ctx.globalAlpha = 1;
       }
 
-      // PASS 2: Trails
+      // PASS 3: Trails (monospace)
       const outsideColor = hexToRgba(colors.outsideTrail, 1);
       const insideColor = colors.accent;
 
@@ -623,7 +490,7 @@ export function MatrixTrailsAutoma({
       ctx.shadowBlur = 0;
       ctx.shadowColor = "transparent";
 
-      // PASS 3: Word overlay
+      // PASS 4: Highlight overlay (serif)
       const op = clamp(values.wordOpacity ?? 0.6, 0, 1);
       if (op > 0.001) {
         ctx.font = values.wordFont === "serif" ? serifFont : monoFont;
@@ -642,15 +509,15 @@ export function MatrixTrailsAutoma({
       }
     },
     [
+      width,
+      height,
+      values.wallBrightness,
       values.wallLift,
       values.glowRadius,
       values.wordOpacity,
       values.wordFont,
       colors,
       glyph,
-      paintFullWall,
-      maybeTwinkleStripe,
-      flushDirtyCells,
     ]
   );
 
@@ -660,22 +527,6 @@ export function MatrixTrailsAutoma({
     if (!canvas || !width || !height) return;
 
     rebuildAll();
-
-    // Setup wall canvas context
-    const wallCanvas = wallCanvasRef.current;
-    const wallCtx = wallCanvas.getContext("2d");
-    if (!wallCtx) return;
-
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    wallCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    wallCtx.imageSmoothingEnabled = false;
-
-    const grid = gridRef.current;
-    const fontPx = Math.max(6, grid.cell - 4);
-    const monoFont = `${fontPx}px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Noto Sans Mono",monospace`;
-    wallCtx.font = monoFont;
-    wallCtx.textAlign = "center";
-    wallCtx.textBaseline = "middle";
   }, [width, height, values.cellSize, values.fillMode, values.script, values.fixedText, rebuildAll]);
 
   // EFFECT 2: Rasterize mask on text change (no rebuild needed!)
@@ -686,12 +537,7 @@ export function MatrixTrailsAutoma({
     }
   }, [values.maskText, rasterizeHitMask]);
 
-  // EFFECT 3: Force repaint on appearance changes (no rebuild!)
-  useEffect(() => {
-    gridRef.current.forceFullWallPaint = true;
-  }, [values.wallBrightness, values.twinkleSpeed]);
-
-  // EFFECT 4: Main animation loop
+  // EFFECT 3: Main animation loop
   useEffect(() => {
     if (isPaused) {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);

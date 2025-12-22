@@ -2,7 +2,6 @@
 import { siteConfig } from "@/config/site";
 import { Icon } from "astro-icon/components";
 import BaseLayout from "./base-layout.astro";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 type Props = {
   title: string;
@@ -14,11 +13,6 @@ const { title, description } = Astro.props;
 
 <BaseLayout title={title} description={description}>
   <div class="flex min-h-screen flex-col items-center justify-center bg-background">
-
-    <div class="absolute right-4 top-4 md:right-8 md:top-8">
-      <ThemeToggle client:idle />
-    </div>
-
     <div class="w-full max-w-md px-4 py-8 sm:px-0">
       <div class="mb-8 flex flex-col items-center text-center">
         <a href="/" class="mb-6 flex items-center space-x-2">

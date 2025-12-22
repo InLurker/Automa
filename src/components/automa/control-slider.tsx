@@ -1,13 +1,22 @@
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import type { Parameter } from "@/types/automa";
 
 interface ControlSliderProps {
   parameter: Parameter;
   value: number;
   onChange: (value: number) => void;
+  inlineToggleValue?: boolean;
+  onInlineToggleChange?: (value: boolean) => void;
 }
 
-export function ControlSlider({ parameter, value, onChange }: ControlSliderProps) {
+export function ControlSlider({ 
+  parameter, 
+  value, 
+  onChange,
+  inlineToggleValue,
+  onInlineToggleChange
+}: ControlSliderProps) {
   const { label, min = 0, max = 100, step = 1, unit = "" } = parameter;
   
   // Calculate percentage for visual feedback
@@ -15,15 +24,39 @@ export function ControlSlider({ parameter, value, onChange }: ControlSliderProps
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label htmlFor={parameter.key} className="text-sm font-medium text-foreground/90">
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={parameter.key} className="text-sm font-medium text-foreground/90 flex-1">
           {label}
         </Label>
-        <span className="text-xs font-mono text-muted-foreground tabular-nums">
-          {value.toFixed(step < 1 ? 1 : 0)}
-          {unit && <span className="ml-0.5">{unit}</span>}
-        </span>
+        
+        {parameter.inlineToggle && onInlineToggleChange !== undefined && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wider whitespace-nowrap">
+              {parameter.inlineToggle.label}
+            </span>
+            <Switch
+              checked={inlineToggleValue}
+              onCheckedChange={onInlineToggleChange}
+            />
+          </div>
+        )}
+        
+        {!parameter.inlineToggle && (
+          <span className="text-xs font-mono text-muted-foreground tabular-nums">
+            {value.toFixed(step < 1 ? 2 : 0)}
+            {unit && <span className="ml-0.5">{unit}</span>}
+          </span>
+        )}
       </div>
+      
+      {parameter.inlineToggle && (
+        <div className="flex items-center justify-end">
+          <span className="text-xs font-mono text-muted-foreground tabular-nums">
+            {value.toFixed(step < 1 ? 2 : 0)}
+            {unit && <span className="ml-0.5">{unit}</span>}
+          </span>
+        </div>
+      )}
       <div className="relative">
         <input
           id={parameter.key}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Switch } from "@/components/ui/switch";
 import type { Parameter } from "@/types/automa";
 
 interface GradientStop {
@@ -10,9 +11,17 @@ interface ControlGradientProps {
   parameter: Parameter;
   value: string; // JSON string
   onChange: (value: string) => void;
+  inlineToggleValue?: boolean;
+  onInlineToggleChange?: (value: boolean) => void;
 }
 
-export function ControlGradient({ parameter, value, onChange }: ControlGradientProps) {
+export function ControlGradient({ 
+  parameter, 
+  value, 
+  onChange,
+  inlineToggleValue,
+  onInlineToggleChange
+}: ControlGradientProps) {
   const [stops, setStops] = useState<GradientStop[]>([]);
   const [selectedStop, setSelectedStop] = useState<GradientStop | null>(null);
   const [dragging, setDragging] = useState<{
@@ -170,9 +179,43 @@ export function ControlGradient({ parameter, value, onChange }: ControlGradientP
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-xs font-medium text-foreground">{parameter.label}</label>
-        <div className="flex gap-1">
+      <div className="flex items-center justify-between gap-3">
+        <label className="text-sm font-medium text-foreground/90 flex-1">{parameter.label}</label>
+        
+        {parameter.inlineToggle && onInlineToggleChange !== undefined && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wider whitespace-nowrap">
+              {parameter.inlineToggle.label}
+            </span>
+            <Switch
+              checked={inlineToggleValue}
+              onCheckedChange={onInlineToggleChange}
+            />
+          </div>
+        )}
+        
+        {!parameter.inlineToggle && (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => applyPreset("soft")}
+              className="text-[10px] px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Soft
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset("sharp")}
+              className="text-[10px] px-2 py-0.5 rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Sharp
+            </button>
+          </div>
+        )}
+      </div>
+      
+      {parameter.inlineToggle && (
+        <div className="flex items-center justify-end gap-1">
           <button
             type="button"
             onClick={() => applyPreset("soft")}
@@ -188,7 +231,7 @@ export function ControlGradient({ parameter, value, onChange }: ControlGradientP
             Sharp
           </button>
         </div>
-      </div>
+      )}
 
       {/* Gradient bar */}
       <div

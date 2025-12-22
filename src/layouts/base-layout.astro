@@ -15,11 +15,11 @@ const { title, description, bodyClass } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="scroll-smooth dark">
   <head>
     <BaseHead title={title} description={description} />
   </head>
-  <body class={cn("flex flex-col min-h-screen", bodyClass)}>
+  <body class={cn("flex flex-col min-h-screen bg-background text-foreground", bodyClass)}>
     <slot />
     <TailwindIndicator />
     <Toaster richColors client:only="react" />

@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import BaseLayout from "./base-layout.astro";
 import { SheetMobileNav } from "@/components/layout/sheet-mobile-nav";
 import { navMenuConfig } from "@/config/nav-menu";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/config/site";
 import { Icon } from "astro-icon/components";
 // import { marketingConfig } from "@/config/marketing";
@@ -52,7 +51,6 @@ const { title, description, mainClass } = Astro.props;
       >
         <Icon name="github" class="size-[22px]" />
       </a>
-      <ThemeToggle client:load />
     </div>
   </Header>
 
