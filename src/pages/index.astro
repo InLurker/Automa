@@ -1,27 +1,20 @@
 ---
-import PageHeader from "@/components/page-header.astro";
 import MainLayout from "@/layouts/main-layout.astro";
+import StudioBalls from "@/components/automa/popcorn-box";
 ---
 
-<MainLayout title="">
-  <div class="bg-background min-h-screen flex items-center justify-center">
-    <section class="container py-12 text-center">
-      <PageHeader
-        heading="Automa"
-        text="A minimalist zen playground for interactive animations"
-      />
+<MainLayout title="Automa">
+  <div class="bg-background min-h-[calc(100vh-64px)] flex flex-col items-center justify-center relative overflow-hidden">
+    <!-- Centered Canvas -->
+    <div class="relative z-10 flex items-center justify-center">
+      <StudioBalls client:load />
+    </div>
 
-      <div class="mt-12">
-        <a
-          href="/explore"
-          class="inline-flex items-center justify-center rounded-md text-sm font-medium 
-                 ring-offset-background transition-all h-11 px-8 
-                 bg-foreground text-background hover:bg-foreground/90
-                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
-        >
-          Explore Automa
-        </a>
+    <!-- Bottom Detail -->
+    <div class="absolute bottom-12 left-0 right-0 flex justify-center z-10 opacity-40 animate-pulse pointer-events-none">
+      <div class="text-[10px] uppercase tracking-[0.5em] text-muted-foreground">
+        Move mouse quickly to strike particles
       </div>
-    </section>
+    </div>
   </div>
 </MainLayout>
