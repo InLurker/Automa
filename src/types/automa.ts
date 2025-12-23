@@ -2,7 +2,7 @@
 
 export type AutomaTheme = "Flow" | "Structure" | "Rhythm" | "Typography";
 
-export type ParameterType = "slider" | "number" | "select" | "toggle" | "text" | "color" | "gradient";
+export type ParameterType = "slider" | "number" | "select" | "toggle" | "text" | "color" | "gradient" | "text-array";
 
 export type ParameterGroup = "Motion" | "Geometry" | "Appearance" | "Timing";
 

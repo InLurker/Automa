@@ -361,7 +361,7 @@ export const automaRegistry: AutomaRegistry[] = [
       {
         key: "fixedText",
         label: "Fixed Text",
-        type: "text",
+        type: "text-array",
         group: "Geometry",
         live: false,
         visibleWhen: {
@@ -369,6 +369,21 @@ export const automaRegistry: AutomaRegistry[] = [
           value: "fixed",
         },
         placeholder: "你好世界",
+      },
+      {
+        key: "textOrientation",
+        label: "Text Orientation",
+        type: "select",
+        group: "Geometry",
+        live: false,
+        visibleWhen: {
+          key: "fillMode",
+          value: "fixed",
+        },
+        options: [
+          { label: "Horizontal", value: "horizontal" },
+          { label: "Vertical", value: "vertical" },
+        ],
       },
 
       // RAIN BEHAVIOR
@@ -441,7 +456,8 @@ export const automaRegistry: AutomaRegistry[] = [
       cellSize: 16,
       fillMode: "random",
       script: "chinese",
-      fixedText: "你好世界",
+      fixedText: ["你好世界"],
+      textOrientation: "horizontal",
       rainSpeed: 12,
       outsideStrength: 0.18,
       insideStrength: 1.0,
@@ -585,7 +601,7 @@ export const automaRegistry: AutomaRegistry[] = [
       {
         key: "fixedText",
         label: "Fixed Text",
-        type: "text",
+        type: "text-array",
         group: "Geometry",
         live: false,
         visibleWhen: {
@@ -593,6 +609,21 @@ export const automaRegistry: AutomaRegistry[] = [
           value: "fixed",
         },
         placeholder: "你好世界",
+      },
+      {
+        key: "textOrientation",
+        label: "Text Orientation",
+        type: "select",
+        group: "Geometry",
+        live: false,
+        visibleWhen: {
+          key: "fillMode",
+          value: "fixed",
+        },
+        options: [
+          { label: "Horizontal", value: "horizontal" },
+          { label: "Vertical", value: "vertical" },
+        ],
       },
 
       // MOTION
@@ -622,7 +653,8 @@ export const automaRegistry: AutomaRegistry[] = [
       cellSize: 16,
       fillMode: "random",
       lang: "chinese",
-      fixedText: "你好世界",
+      fixedText: ["你好世界"],
+      textOrientation: "horizontal",
       mainText: "你好",
       speed: 6,
       sweepHalfWidth: 0.22,
@@ -763,7 +795,7 @@ export const automaRegistry: AutomaRegistry[] = [
       {
         key: "fixedText",
         label: "Fixed Text",
-        type: "text",
+        type: "text-array",
         group: "Geometry",
         live: false,
         visibleWhen: {
@@ -771,6 +803,21 @@ export const automaRegistry: AutomaRegistry[] = [
           value: "fixed",
         },
         placeholder: "你好世界",
+      },
+      {
+        key: "textOrientation",
+        label: "Text Orientation",
+        type: "select",
+        group: "Geometry",
+        live: false,
+        visibleWhen: {
+          key: "bgType",
+          value: "fixed",
+        },
+        options: [
+          { label: "Horizontal", value: "horizontal" },
+          { label: "Vertical", value: "vertical" },
+        ],
       },
 
       // MOTION
@@ -800,7 +847,8 @@ export const automaRegistry: AutomaRegistry[] = [
       cellSize: 16,
       bgType: "random",
       lang: "chinese",
-      fixedText: "你好世界",
+      fixedText: ["你好世界"],
+      textOrientation: "horizontal",
       largeText: "你好",
       highlightOpacity: 0.98,
       speed: 10,

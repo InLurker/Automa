@@ -7,6 +7,7 @@ import { ControlSelect } from "./control-select";
 import { ControlText } from "./control-text";
 import { ControlColor } from "./control-color";
 import { ControlGradient } from "./control-gradient";
+import { ControlTextArray } from "./control-text-array";
 import { ControlSection } from "./control-section";
 
 interface ControlsPanelProps {
@@ -101,6 +102,15 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
       case "text":
         control = (
           <ControlText
+            parameter={param}
+            value={value}
+            onChange={(v) => handleChange(param.key, v, param.live)}
+          />
+        );
+        break;
+      case "text-array":
+        control = (
+          <ControlTextArray
             parameter={param}
             value={value}
             onChange={(v) => handleChange(param.key, v, param.live)}

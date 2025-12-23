@@ -19,15 +19,29 @@ function randomWallCodepoint(script: string): number {
   }
 }
 
-function buildFixedPool(str: string): Uint32Array {
-  const cleaned = (str && str.trim()) || "你好世界";
-  const arr = Array.from(cleaned);
-  if (!arr.length) return new Uint32Array([0x4e00]);
-  const cps = new Uint32Array(arr.length);
-  for (let i = 0; i < arr.length; i++) {
-    cps[i] = arr[i].codePointAt(0) || 63;
+function buildFixedPool(textArray: string[] | string, orientation: string = "horizontal"): Uint32Array {
+  // Handle both array and legacy string format
+  let texts: string[];
+  if (Array.isArray(textArray)) {
+    texts = textArray.map(t => t.trim()).filter(t => t.length > 0);
+  } else {
+    const cleaned = (textArray && textArray.trim()) || "你好世界";
+    texts = cleaned.split(',').map(t => t.trim()).filter(t => t.length > 0);
   }
-  return cps;
+  
+  if (!texts.length) return new Uint32Array([0x4e00]);
+  
+  const result: number[] = [];
+  
+  for (const text of texts) {
+    const chars = Array.from(text);
+    // Just add all characters - orientation affects layout, not character insertion
+    for (const char of chars) {
+      result.push(char.codePointAt(0) || 63);
+    }
+  }
+  
+  return Uint32Array.from(result);
 }
 
 function clamp(n: number, a: number, b: number) {
@@ -265,19 +279,38 @@ export function MatrixTrailsAutoma({
       grid.dropSpd[c] = 0.6 + Math.random() * 1.4;
     }
 
-    grid.fixedPool = buildFixedPool(values.fixedText || "你好世界");
-
     const mode = values.fillMode || "random";
     const script = values.script || "chinese";
+    const orientation = values.textOrientation || "horizontal";
+
+    grid.fixedPool = buildFixedPool(values.fixedText || ["你好世界"], orientation);
 
     if (mode === "fixed") {
       const pool = grid.fixedPool.length ? grid.fixedPool : new Uint32Array([63]);
-      for (let i = 0; i < total; i++) {
-        const cp = pool[i % pool.length];
-        grid.wallChars[i] = cp;
-        grid.baseChars[i] = cp;
-        grid.twPhase[i] = Math.random() * Math.PI * 2;
-        grid.twSpeed[i] = 0.15 + Math.random() * 0.35;
+      
+      if (orientation === "vertical") {
+        // Column-major order: fill columns top-to-bottom, then move to next column
+        let charIndex = 0;
+        for (let c = 0; c < grid.cols; c++) {
+          for (let r = 0; r < grid.rows; r++) {
+            const i = r * grid.cols + c;
+            const cp = pool[charIndex % pool.length];
+            grid.wallChars[i] = cp;
+            grid.baseChars[i] = cp;
+            grid.twPhase[i] = Math.random() * Math.PI * 2;
+            grid.twSpeed[i] = 0.15 + Math.random() * 0.35;
+            charIndex++;
+          }
+        }
+      } else {
+        // Horizontal (default): row-major order
+        for (let i = 0; i < total; i++) {
+          const cp = pool[i % pool.length];
+          grid.wallChars[i] = cp;
+          grid.baseChars[i] = cp;
+          grid.twPhase[i] = Math.random() * Math.PI * 2;
+          grid.twSpeed[i] = 0.15 + Math.random() * 0.35;
+        }
       }
     } else {
       for (let i = 0; i < total; i++) {
@@ -290,7 +323,7 @@ export function MatrixTrailsAutoma({
     }
 
     rasterizeHitMask(values.maskText || "你好", grid.cols, grid.rows);
-  }, [width, height, values.cellSize, values.fillMode, values.script, values.fixedText, values.maskText, rasterizeHitMask]);
+  }, [width, height, values.cellSize, values.fillMode, values.script, values.fixedText, values.textOrientation, values.maskText, rasterizeHitMask]);
 
 
   // Add active

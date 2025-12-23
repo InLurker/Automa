@@ -34,6 +34,31 @@ function hexToRgba(hex: string, alpha: number = 1): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function buildFixedPool(textArray: string[] | string, orientation: string = "horizontal"): Uint32Array {
+  // Handle both array and legacy string format
+  let texts: string[];
+  if (Array.isArray(textArray)) {
+    texts = textArray.map(t => t.trim()).filter(t => t.length > 0);
+  } else {
+    const cleaned = (textArray && textArray.trim()) || "你好世界";
+    texts = cleaned.split(',').map(t => t.trim()).filter(t => t.length > 0);
+  }
+  
+  if (!texts.length) return new Uint32Array([0x4e00]);
+  
+  const result: number[] = [];
+  
+  for (const text of texts) {
+    const chars = Array.from(text);
+    // Just add all characters - orientation affects layout, not character insertion
+    for (const char of chars) {
+      result.push(char.codePointAt(0) || 63);
+    }
+  }
+  
+  return Uint32Array.from(result);
+}
+
 interface GradientStop {
   p: number; // position 0-1
   v: number; // value 0-1
@@ -236,23 +261,38 @@ export function ShimmerWallAutoma({
 
     const mode = values.fillMode || "random";
     const script = values.lang || "chinese";
-    const fixedStr = (values.fixedText && values.fixedText.trim()) || "你好世界";
-    const fixedCps = Array.from(fixedStr);
-    const fixedLen = fixedCps.length || 1;
-    let fi = 0;
+    const orientation = values.textOrientation || "horizontal";
+    const fixedPool = buildFixedPool(values.fixedText || ["你好世界"], orientation);
+    const fixedLen = fixedPool.length || 1;
 
-    for (let i = 0; i < total; i++) {
-      const cp =
-        mode === "random"
-          ? randomChar(script)
-          : fixedCps[fi++ % fixedLen].codePointAt(0) || 63;
-      grid.chars[i] = cp;
-      grid.twPhase[i] = Math.random() * Math.PI * 2;
-      grid.twSpeed[i] = 0.15 + Math.random() * 0.35;
+    if (mode === "fixed" && orientation === "vertical") {
+      // Column-major order: fill columns top-to-bottom, then move to next column
+      let charIndex = 0;
+      for (let c = 0; c < grid.cols; c++) {
+        for (let r = 0; r < grid.rows; r++) {
+          const i = r * grid.cols + c;
+          grid.chars[i] = fixedPool[charIndex % fixedLen];
+          grid.twPhase[i] = Math.random() * Math.PI * 2;
+          grid.twSpeed[i] = 0.15 + Math.random() * 0.35;
+          charIndex++;
+        }
+      }
+    } else {
+      // Horizontal (default) or random: row-major order
+      let fi = 0;
+      for (let i = 0; i < total; i++) {
+        const cp =
+          mode === "random"
+            ? randomChar(script)
+            : fixedPool[fi++ % fixedLen];
+        grid.chars[i] = cp;
+        grid.twPhase[i] = Math.random() * Math.PI * 2;
+        grid.twSpeed[i] = 0.15 + Math.random() * 0.35;
+      }
     }
 
     rasterizeTextToMask(values.mainText || "你好", grid.cols, grid.rows);
-  }, [width, height, values.cellSize, values.fillMode, values.lang, values.fixedText, values.mainText, rasterizeTextToMask]);
+  }, [width, height, values.cellSize, values.fillMode, values.lang, values.fixedText, values.textOrientation, values.mainText, rasterizeTextToMask]);
 
   // Main draw loop - MEMOIZED
   const draw = useCallback(
