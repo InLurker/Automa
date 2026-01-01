@@ -875,7 +875,7 @@ export const automaRegistry: AutomaRegistry[] = [
       // APPEARANCE
       {
         key: "mediaUrl",
-        label: "Media URL",
+        label: "Media",
         type: "media",
         group: "Appearance",
         live: false,
@@ -891,16 +891,6 @@ export const automaRegistry: AutomaRegistry[] = [
           key: "keepColor",
           label: "Static",
         },
-      },
-      {
-        key: "baseBrightness",
-        label: "Base Brightness",
-        type: "slider",
-        group: "Appearance",
-        live: true,
-        min: 0,
-        max: 1,
-        step: 0.05,
       },
       {
         key: "contrast",
@@ -950,7 +940,7 @@ export const automaRegistry: AutomaRegistry[] = [
       cellSize: 16,
       script: "chinese",
       baseColor: "#ffffff",
-      baseBrightness: 0.15,
+      baseBrightness: 0.3,
       contrast: 1.5,
       invert: false,
       keepColor: false,

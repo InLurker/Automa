@@ -160,42 +160,45 @@ export function ControlMedia({ parameter, value, onChange }: ControlMediaProps) 
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={parameter.key} className="text-sm font-medium">
-        {label}
-      </Label>
-      
-      {/* File upload button */}
-      <div className="flex gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          className="flex-shrink-0"
-        >
-          Upload Media
-        </Button>
-        {value && (
-          <Button
+      <div className="flex items-center justify-between">
+        <Label htmlFor={parameter.key} className="text-sm font-medium">
+          {label}
+        </Label>
+        <div className="flex items-center gap-1">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
             type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onChange("");
-              setMediaType(null);
-            }}
-            className="flex-shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            title="Upload file"
           >
-            Clear
-          </Button>
-        )}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 10V3M7 3L4 6M7 3l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+          {value && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setMediaType(null);
+              }}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Clear"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* URL input */}
@@ -210,19 +213,14 @@ export function ControlMedia({ parameter, value, onChange }: ControlMediaProps) 
               onChange(e.target.value);
               setMediaType(null); // Reset to auto-detect
             }}
-            className={`h-9 font-mono text-xs pr-8 ${
+            className={`h-9 font-mono text-xs ${value && validationState === 'validating' ? 'pr-8' : 'pr-2'} ${
               validationState === 'error' ? 'border-red-500 focus-visible:ring-red-500' : ''
             }`}
           />
-          {/* Validation indicator */}
-          {value && (
+          {/* Validation indicator - only spinner */}
+          {value && validationState === 'validating' && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              {validationState === 'validating' && (
-                <div className="w-4 h-4 border-2 border-muted border-t-foreground rounded-full animate-spin"></div>
-              )}
-              {validationState === 'error' && (
-                <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">✕</div>
-              )}
+              <div className="w-4 h-4 border-2 border-muted border-t-foreground rounded-full animate-spin"></div>
             </div>
           )}
         </div>

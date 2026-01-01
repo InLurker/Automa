@@ -1,5 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { parseGIF, decompressFrames } from "gifuct-js";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import type { AutomaComponentProps } from "@/types/automa";
 
 // Glyph generation helpers
@@ -54,11 +56,11 @@ export function ImageProjectionAutoma({
   const [isGif, setIsGif] = useState(false);
   
   // Video export state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
-  const recordingTimerRef = useRef<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatus, setExportStatus] = useState("");
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const ffmpegLoadedRef = useRef(false);
 
   // Extract values FIRST (support both old imageUrl and new mediaUrl)
   const {
@@ -399,12 +401,6 @@ export function ImageProjectionAutoma({
     const mH = mediaHeight ?? (mediaRef.current instanceof HTMLVideoElement ? mediaRef.current.videoHeight : mediaRef.current?.height ?? 0);
     if (!mW || !mH) return;
 
-    // Only recalculate if dimensions changed
-    const current = transformParamsRef.current;
-    if (current && current.mediaWidth === mW && current.mediaHeight === mH) {
-      return;
-    }
-
     const canvasAspect = width / height;
     const mediaAspect = mW / mH;
 
@@ -433,8 +429,8 @@ export function ImageProjectionAutoma({
     const transform = transformParamsRef.current;
     
     if (!frameData || !transform) {
-      // No media loaded yet - return visible default
-      return { brightness: 1, color: baseColor };
+      // No media loaded yet - use base brightness
+      return { brightness: baseBrightness, color: baseColor };
     }
 
     // Map canvas coordinates to media coordinates (using pre-calculated transform)
@@ -462,6 +458,9 @@ export function ImageProjectionAutoma({
     if (invert && !keepColor) {
       brightness = 1 - brightness;
     }
+
+    // When media is loaded, use 0 base brightness (follow image color only)
+    // brightness stays as calculated from the image
 
     // Return color if keeping color, otherwise use baseColor with brightness
     const color = keepColor 
@@ -619,138 +618,288 @@ export function ImageProjectionAutoma({
     };
   }, [width, height, isPaused, baseColor, baseBrightness, contrast, invert, keepColor, url, isVideo, isGif, cellSize, script]);
 
+  // Load ffmpeg on mount
+  useEffect(() => {
+    const loadFFmpeg = async () => {
+      if (ffmpegLoadedRef.current) return;
+      
+      try {
+        const ffmpeg = new FFmpeg();
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+        
+        ffmpegRef.current = ffmpeg;
+        ffmpegLoadedRef.current = true;
+      } catch (err) {
+        console.error('Failed to load FFmpeg:', err);
+      }
+    };
+    
+    loadFFmpeg();
+  }, []);
+
   // Video export functions
-  const startRecording = () => {
+  const startExport = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Check if we have media to export
+    if (!mediaRef.current) {
+      alert('Please load media before exporting.');
+      return;
+    }
+
+    // Check if ffmpeg is loaded
+    if (!ffmpegRef.current || !ffmpegLoadedRef.current) {
+      alert('Video encoder is still loading. Please try again in a moment.');
+      return;
+    }
+
     try {
-      const stream = canvas.captureStream(30); // 30 fps
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 5000000, // 5 Mbps
-      });
+      setIsExporting(true);
+      setExportProgress(0);
+      setExportStatus("Initializing...");
 
-      recordedChunksRef.current = [];
+      const ffmpeg = ffmpegRef.current;
+      const fps = 30;
+      let totalFrames = fps * 5; // Default: 5 seconds for static images
+      let frameDuration = 1000 / fps; // ms per frame
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
+      // For GIF/Video, use actual duration
+      if (isGif && gifDelaysRef.current.length > 0) {
+        // For GIF, render one full loop
+        totalFrames = gifDelaysRef.current.length;
+        frameDuration = gifDelaysRef.current[0]; // Will vary per frame
+      } else if (isVideo && mediaRef.current instanceof HTMLVideoElement) {
+        const videoDuration = mediaRef.current.duration || 5;
+        totalFrames = Math.ceil(videoDuration * fps);
+      }
+
+      setExportStatus(`Rendering ${totalFrames} frames...`);
+
+      // Pause animation during export
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+
+      // Render frames
+      const frames: Uint8Array[] = [];
+      
+      for (let i = 0; i < totalFrames; i++) {
+        // Update frame for GIF/video
+        if (isGif && gifFramesRef.current.length > 0) {
+          const frameIdx = i % gifFramesRef.current.length;
+          frameImageDataRef.current = gifFramesRef.current[frameIdx];
+        } else if (isVideo && mediaRef.current instanceof HTMLVideoElement && offscreenCanvasRef.current && offscreenCtxRef.current) {
+          const video = mediaRef.current;
+          video.currentTime = (i / fps);
+          await new Promise(resolve => {
+            video.onseeked = () => resolve(null);
+          });
+          offscreenCtxRef.current.drawImage(video, 0, 0);
+          frameImageDataRef.current = offscreenCtxRef.current.getImageData(0, 0, video.videoWidth, video.videoHeight);
         }
-      };
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `automa-export-${Date.now()}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
-      };
+        // Render to canvas (reuse existing render logic)
+        const ctx = canvas.getContext("2d");
+        if (!ctx || !gridRef.current || !frameImageDataRef.current || !transformParamsRef.current) continue;
 
-      mediaRecorder.start();
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
-      setRecordingTime(0);
+        const grid = gridRef.current;
+        
+        // Clear
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, width, height);
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
 
-      // Start timer
-      const startTime = Date.now();
-      recordingTimerRef.current = window.setInterval(() => {
-        setRecordingTime(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
+        // Sample and render (simplified version of main render loop)
+        const cellHalf = grid.cell / 2;
+        const gridCellHalf50 = grid.cell * 0.5;
+        
+        for (let row = 0; row < grid.rows; row++) {
+          const y = row * grid.cell + cellHalf;
+          for (let col = 0; col < grid.cols; col++) {
+            const x = col * grid.cell + cellHalf;
+            const idx = row * grid.cols + col;
+            
+            const sample = sampleMedia(x, y);
+            const fontSize = Math.max(8, gridCellHalf50 + sample.brightness * gridCellHalf50);
+            const color = keepColor ? sample.color : hexToRgba(baseColor, sample.brightness);
+            
+            ctx.font = `${Math.round(fontSize)}px monospace`;
+            ctx.fillStyle = color;
+            ctx.fillText(grid.charStrings[idx], x, y);
+          }
+        }
+
+        // Convert canvas to PNG
+        const blob = await new Promise<Blob | null>(resolve => {
+          canvas.toBlob(resolve, 'image/png');
+        });
+        
+        if (blob) {
+          const arrayBuffer = await blob.arrayBuffer();
+          frames.push(new Uint8Array(arrayBuffer));
+        }
+
+        setExportProgress(Math.floor(((i + 1) / totalFrames) * 50)); // 0-50% for rendering
+      }
+
+      // Encode with ffmpeg
+      setExportStatus("Encoding video...");
+
+      // Write frames to ffmpeg filesystem
+      for (let i = 0; i < frames.length; i++) {
+        await ffmpeg.writeFile(`frame${i.toString().padStart(5, '0')}.png`, frames[i]);
+        setExportProgress(50 + Math.floor(((i + 1) / frames.length) * 30)); // 50-80% for writing
+      }
+
+      // Run ffmpeg
+      setExportStatus("Compressing...");
+      await ffmpeg.exec([
+        '-framerate', fps.toString(),
+        '-i', 'frame%05d.png',
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        '-preset', 'medium',
+        'output.mp4'
+      ]);
+
+      setExportProgress(90);
+      setExportStatus("Finalizing...");
+
+      // Read output
+      const data = await ffmpeg.readFile('output.mp4');
+      const videoBlob = new Blob([data], { type: 'video/mp4' });
+      const videoUrl = URL.createObjectURL(videoBlob);
+      
+      // Download
+      const a = document.createElement('a');
+      a.href = videoUrl;
+      a.download = `automa-export-${Date.now()}.mp4`;
+      a.click();
+      URL.revokeObjectURL(videoUrl);
+
+      // Cleanup ffmpeg filesystem
+      for (let i = 0; i < frames.length; i++) {
+        await ffmpeg.deleteFile(`frame${i.toString().padStart(5, '0')}.png`);
+      }
+      await ffmpeg.deleteFile('output.mp4');
+
+      setExportProgress(100);
+      setExportStatus("Complete!");
+      
+      setTimeout(() => {
+        setIsExporting(false);
+        setExportProgress(0);
+        setExportStatus("");
+      }, 1500);
+
     } catch (err) {
-      alert('Failed to start recording. Your browser may not support this feature.');
+      setIsExporting(false);
+      setExportProgress(0);
+      setExportStatus("");
+      alert(`Failed to export video: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-    setIsRecording(false);
-    setRecordingTime(0);
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-      }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-    };
-  }, []);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <canvas
         ref={canvasRef}
         width={width}
         height={height}
-        style={{ display: "block", width: "100%", flex: 1 }}
+        style={{ display: "block", maxWidth: "100%", maxHeight: "100%" }}
       />
-      <div style={{ 
-        padding: "12px", 
-        background: "#111", 
-        borderTop: "1px solid #333",
+      
+      {/* Floating export button */}
+      <div style={{
+        position: "absolute",
+        bottom: "24px",
+        right: "24px",
         display: "flex",
-        alignItems: "center",
-        gap: "12px"
+        flexDirection: "column",
+        gap: "12px",
+        alignItems: "flex-end",
+        zIndex: 10,
       }}>
-        {!isRecording ? (
-          <button
-            onClick={startRecording}
-            style={{
-              padding: "8px 16px",
-              background: "#e11d48",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: 500,
-              fontSize: "14px",
-            }}
-          >
-            ● Start Recording
-          </button>
-        ) : (
-          <>
-            <button
-              onClick={stopRecording}
-              style={{
-                padding: "8px 16px",
-                background: "#dc2626",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: 500,
-                fontSize: "14px",
-              }}
-            >
-              ■ Stop & Download
-            </button>
-            <span style={{ color: "#e11d48", fontWeight: 500, fontSize: "14px" }}>
-              Recording: {formatTime(recordingTime)}
-            </span>
-          </>
+        {isExporting && (
+          <div style={{
+            padding: "12px 16px",
+            background: "rgba(0, 0, 0, 0.9)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "8px",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            minWidth: "200px",
+          }}>
+            <div style={{ color: "white", fontWeight: 500, fontSize: "13px", marginBottom: "8px" }}>
+              {exportStatus}
+            </div>
+            <div style={{ 
+              width: "100%", 
+              height: "4px", 
+              background: "rgba(255, 255, 255, 0.1)", 
+              borderRadius: "2px",
+              overflow: "hidden"
+            }}>
+              <div style={{ 
+                width: `${exportProgress}%`, 
+                height: "100%", 
+                background: "linear-gradient(90deg, #3b82f6, #06b6d4)",
+                transition: "width 0.3s ease"
+              }} />
+            </div>
+            <div style={{ color: "#888", fontSize: "11px", marginTop: "4px", textAlign: "right" }}>
+              {exportProgress}%
+            </div>
+          </div>
         )}
-        <span style={{ color: "#666", fontSize: "12px", marginLeft: "auto" }}>
-          WebM format, 30fps
-        </span>
+        
+        <button
+          onClick={startExport}
+          disabled={isExporting}
+          style={{
+            padding: "10px 16px",
+            background: isExporting ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.8)",
+            backdropFilter: "blur(10px)",
+            color: isExporting ? "#666" : "white",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            borderRadius: "8px",
+            cursor: isExporting ? "not-allowed" : "pointer",
+            fontWeight: 500,
+            fontSize: "14px",
+            transition: "all 0.2s",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            boxShadow: isExporting ? "none" : "0 0 16px rgba(255, 255, 255, 0.3), 0 4px 16px rgba(0, 0, 0, 0.4)",
+          }}
+          onMouseEnter={(e) => {
+            if (!isExporting) {
+              e.currentTarget.style.background = "rgba(0, 0, 0, 0.9)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+              e.currentTarget.style.boxShadow = "0 0 20px rgba(255, 255, 255, 0.4), 0 4px 16px rgba(0, 0, 0, 0.5)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isExporting) {
+              e.currentTarget.style.background = "rgba(0, 0, 0, 0.8)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
+              e.currentTarget.style.boxShadow = "0 0 16px rgba(255, 255, 255, 0.3), 0 4px 16px rgba(0, 0, 0, 0.4)";
+            }
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M3 2h8l2 2v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+            <path d="M9 2v3H4V2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+            <rect x="5" y="9" width="6" height="4" fill="currentColor"/>
+          </svg>
+          {isExporting ? "Exporting..." : "Export"}
+        </button>
       </div>
     </div>
   );

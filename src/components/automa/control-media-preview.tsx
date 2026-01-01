@@ -200,32 +200,30 @@ export function ControlMediaPreview({
 
       {/* Video Controls */}
       {isVideo && !isLoading && (
-        <div className="space-y-2">
-          {/* Playback Controls */}
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onPlayingChange(!isPlaying)}
-              className="flex-1"
-            >
-              {isPlaying ? "Pause" : "Play"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onMutedChange(!isMuted)}
-              className="flex-1"
-            >
-              {isMuted ? "Unmute" : "Mute"}
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          {/* Play/Pause Button */}
+          <button
+            type="button"
+            onClick={() => onPlayingChange(!isPlaying)}
+            className="flex items-center justify-center w-7 h-7 rounded hover:bg-accent/50 transition-colors flex-shrink-0"
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? (
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <rect x="4" y="3" width="2" height="8" fill="currentColor" rx="0.5"/>
+                <rect x="8" y="3" width="2" height="8" fill="currentColor" rx="0.5"/>
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M4 3l7 4-7 4V3z" fill="currentColor"/>
+              </svg>
+            )}
+          </button>
 
-          {/* Seek Bar */}
+          {/* Timeline */}
           {duration > 0 && (
-            <div className="space-y-1">
+            <div className="flex-1 flex items-center gap-2 min-w-0">
+              <span className="text-[10px] text-muted-foreground font-mono tabular-nums flex-shrink-0">{formatTime(localTime)}</span>
               <input
                 type="range"
                 min={0}
@@ -237,14 +235,31 @@ export function ControlMediaPreview({
                 onMouseUp={() => handleSeekEnd([localTime])}
                 onTouchStart={handleSeekStart}
                 onTouchEnd={() => handleSeekEnd([localTime])}
-                className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:border-0"
+                className="flex-1 min-w-0 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:border-0"
               />
-              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>{formatTime(localTime)}</span>
-                <span>{formatTime(duration)}</span>
-              </div>
+              <span className="text-[10px] text-muted-foreground font-mono tabular-nums flex-shrink-0">{formatTime(duration)}</span>
             </div>
           )}
+
+          {/* Mute/Unmute Button */}
+          <button
+            type="button"
+            onClick={() => onMutedChange(!isMuted)}
+            className="flex items-center justify-center w-7 h-7 rounded hover:bg-accent/50 transition-colors flex-shrink-0"
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? (
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M7 3L4.5 5.5H2.5v3H4.5L7 11V3z" fill="currentColor"/>
+                <path d="M9.5 5.5l3 3M12.5 5.5l-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M7 3L4.5 5.5H2.5v3H4.5L7 11V3z" fill="currentColor"/>
+                <path d="M9 5.5c.5.5.5 2.5 0 3M10.5 4c1 1 1 5 0 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+            )}
+          </button>
         </div>
       )}
       

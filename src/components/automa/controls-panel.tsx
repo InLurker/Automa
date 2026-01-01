@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { AutomaRegistry, Parameter, ParameterGroup } from "@/types/automa";
 import { ControlSlider } from "./control-slider";
 import { ControlNumber } from "./control-number";
@@ -20,6 +20,13 @@ interface ControlsPanelProps {
 
 export function ControlsPanel({ automa, values: initialValues, onValuesChange }: ControlsPanelProps) {
   const [values, setValues] = useState<Record<string, any>>(initialValues || automa.defaults);
+
+  // Sync with parent values when they change (e.g., on remount after sidebar toggle)
+  useEffect(() => {
+    if (initialValues) {
+      setValues(initialValues);
+    }
+  }, [initialValues]);
 
   // Group parameters by their group
   const groupedParams = automa.schema.reduce((acc, param) => {

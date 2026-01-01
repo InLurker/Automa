@@ -14,6 +14,7 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
   const [showControls, setShowControls] = useState(true);
   const [animationPaused, setAnimationPaused] = useState(false);
   const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hiddenVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -22,6 +23,41 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
       }
     };
   }, []);
+
+  // Sync hidden video with state when sidebar is closed
+  useEffect(() => {
+    const video = hiddenVideoRef.current;
+    if (!video || showControls) return;
+
+    const mediaUrl = values.mediaUrl;
+    const isVideo = mediaUrl && (
+      mediaUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)(\?|#|$)/i) ||
+      mediaUrl.startsWith('data:video/')
+    );
+
+    if (!isVideo) return;
+
+    // Update video source if changed
+    if (video.src !== mediaUrl) {
+      video.src = mediaUrl;
+      video.load();
+    }
+
+    // Sync playback state
+    if (values._videoPlaying) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+
+    // Sync mute state
+    video.muted = values._videoMuted;
+
+    // Sync current time
+    if (Math.abs(video.currentTime - (values._videoCurrentTime || 0)) > 0.5) {
+      video.currentTime = values._videoCurrentTime || 0;
+    }
+  }, [showControls, values.mediaUrl, values._videoPlaying, values._videoMuted, values._videoCurrentTime]);
 
   const handleValuesChange = (newValues: Record<string, any>, live: boolean) => {
     setValues(newValues);
@@ -32,6 +68,19 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
     if (pauseTimeoutRef.current) {
       clearTimeout(pauseTimeoutRef.current);
     }
+    
+    // If restoring sidebar (next = true) and hidden video exists, sync state back
+    if (next && hiddenVideoRef.current) {
+      const video = hiddenVideoRef.current;
+      const newValues = {
+        ...values,
+        _videoPlaying: !video.paused,
+        _videoMuted: video.muted,
+        _videoCurrentTime: video.currentTime,
+      };
+      setValues(newValues);
+    }
+    
     setAnimationPaused(true);
     setShowControls(next);
     pauseTimeoutRef.current = setTimeout(() => {
@@ -65,7 +114,7 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
         </aside>
       )}
 
-      <section className="flex-1 w-full h-full bg-background">
+      <section className="flex-1 h-full bg-background">
         <div className="w-full h-full overflow-hidden">
         {automa.renderer.type === "component" ? (
           <AutomaComponentViewer automa={automa} values={values} isPaused={animationPaused} />
@@ -74,6 +123,17 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
         )}
         </div>
       </section>
+
+      {/* Hidden video for audio when sidebar is closed */}
+      {!showControls && (
+        <video
+          ref={hiddenVideoRef}
+          loop
+          crossOrigin="anonymous"
+          playsInline
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+        />
+      )}
 
       {!showControls && (
         <div className="absolute z-20 top-6 left-6 max-w-sm w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/20 dark:bg-white/5 backdrop-blur-2xl shadow-[0_25px_60px_rgba(0,0,0,0.35)] p-4 pr-12 transition-colors">
