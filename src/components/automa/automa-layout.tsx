@@ -60,12 +60,12 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
           </div>
 
           <div className="flex-1 overflow-hidden">
-            <ControlsPanel automa={automa} onValuesChange={handleValuesChange} />
+            <ControlsPanel automa={automa} values={values} onValuesChange={handleValuesChange} />
           </div>
         </aside>
       )}
 
-      <section className="flex-1 h-full bg-background">
+      <section className="flex-1 w-full h-full bg-background">
         <div className="w-full h-full overflow-hidden">
         {automa.renderer.type === "component" ? (
           <AutomaComponentViewer automa={automa} values={values} isPaused={animationPaused} />

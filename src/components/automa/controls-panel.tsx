@@ -8,15 +8,18 @@ import { ControlText } from "./control-text";
 import { ControlColor } from "./control-color";
 import { ControlGradient } from "./control-gradient";
 import { ControlTextArray } from "./control-text-array";
+import { ControlImage } from "./control-image";
 import { ControlSection } from "./control-section";
+import { ControlMediaPreview } from "./control-media-preview";
 
 interface ControlsPanelProps {
   automa: AutomaRegistry;
+  values?: Record<string, any>;
   onValuesChange: (values: Record<string, any>, isLive: boolean) => void;
 }
 
-export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
-  const [values, setValues] = useState<Record<string, any>>(automa.defaults);
+export function ControlsPanel({ automa, values: initialValues, onValuesChange }: ControlsPanelProps) {
+  const [values, setValues] = useState<Record<string, any>>(initialValues || automa.defaults);
 
   // Group parameters by their group
   const groupedParams = automa.schema.reduce((acc, param) => {
@@ -117,12 +120,27 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
           />
         );
         break;
+      case "image":
+      case "media":
+        control = (
+          <ControlImage
+            parameter={param}
+            value={value}
+            onChange={(v) => handleChange(param.key, v, param.live)}
+          />
+        );
+        break;
       case "color":
         control = (
           <ControlColor
             parameter={param}
             value={value}
             onChange={(v) => handleChange(param.key, v, param.live)}
+            inlineToggleValue={param.inlineToggle ? values[param.inlineToggle.key] : undefined}
+            onInlineToggleChange={param.inlineToggle 
+              ? (v) => handleChange(param.inlineToggle.key, v, true)
+              : undefined
+            }
           />
         );
         break;
@@ -160,6 +178,10 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
     );
   };
 
+  // Check if this automa has media preview (mediaUrl or imageUrl parameter)
+  const hasMediaUrl = automa.schema.some(p => p.key === 'mediaUrl' || p.key === 'imageUrl');
+  const mediaUrlValue = values.mediaUrl || values.imageUrl || "";
+
   return (
     <div className="h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-border/40 scrollbar-track-transparent">
       <div className="px-6 pt-4 pb-2">
@@ -169,6 +191,22 @@ export function ControlsPanel({ automa, onValuesChange }: ControlsPanelProps) {
       </div>
 
       <div className="px-6 pb-8 space-y-3">
+        {/* Media Preview (if applicable) */}
+        {hasMediaUrl && mediaUrlValue && (
+          <div className="rounded-xl border border-border/40 bg-background/70 px-4 py-4 shadow-[0px_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+            <ControlMediaPreview
+              mediaUrl={mediaUrlValue}
+              isPlaying={values._videoPlaying ?? true}
+              isMuted={values._videoMuted ?? false}
+              currentTime={values._videoCurrentTime ?? 0}
+              onPlayingChange={(playing) => handleChange('_videoPlaying', playing, true)}
+              onMutedChange={(muted) => handleChange('_videoMuted', muted, true)}
+              onTimeChange={(time) => handleChange('_videoCurrentTime', time, true)}
+            />
+          </div>
+        )}
+
+        {/* Parameter Groups */}
         {(Object.keys(groupedParams) as ParameterGroup[]).map((group) => (
           <ControlSection key={group} title={group}>
             <div className="space-y-3">{groupedParams[group].map((param) => renderControl(param, true))}</div>

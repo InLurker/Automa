@@ -6,6 +6,7 @@ import { PulseAutoma } from "./renderers/pulse";
 import { MatrixTrailsAutoma } from "./renderers/matrix-trails";
 import { ShimmerWallAutoma } from "./renderers/shimmer-wall";
 import { SweepHighlightAutoma } from "./renderers/sweep-highlight";
+import { ImageProjectionAutoma } from "./renderers/image-projection";
 
 interface AutomaComponentViewerProps {
   automa: AutomaRegistry;
@@ -64,6 +65,8 @@ export function AutomaComponentViewer({ automa, values, isPaused = false }: Auto
         return <ShimmerWallAutoma {...props} />;
       case "sweep-highlight":
         return <SweepHighlightAutoma {...props} />;
+      case "image-projection":
+        return <ImageProjectionAutoma {...props} />;
       default:
         return <div className="text-muted-foreground">Unknown automa type</div>;
     }
