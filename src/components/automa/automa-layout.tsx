@@ -117,7 +117,7 @@ export function AutomaLayout({ automa }: AutomaLayoutProps) {
       <section className="flex-1 h-full bg-background">
         <div className="w-full h-full overflow-hidden">
         {automa.renderer.type === "component" ? (
-          <AutomaComponentViewer automa={automa} values={values} isPaused={animationPaused} />
+          <AutomaComponentViewer automa={automa} values={values} isPaused={animationPaused} onChange={setValues} />
         ) : (
           <AutomaViewer automa={automa} values={values} isLive={isLive} isPaused={animationPaused} />
         )}

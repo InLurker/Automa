@@ -38,7 +38,17 @@ export function ControlsPanel({ automa, values: initialValues, onValuesChange }:
   }, {} as Record<ParameterGroup, Parameter[]>);
 
   const handleChange = (key: string, value: any, live: boolean) => {
-    const newValues = { ...values, [key]: value };
+    let newValues = { ...values, [key]: value };
+    
+    // When URL changes, reset video state to paused and time to 0
+    if (key === 'url' && value !== values.url) {
+      newValues = {
+        ...newValues,
+        _videoPlaying: false,
+        _videoCurrentTime: 0,
+      };
+    }
+    
     setValues(newValues);
     onValuesChange(newValues, live);
   };

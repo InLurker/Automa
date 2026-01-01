@@ -1,7 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { parseGIF, decompressFrames } from "gifuct-js";
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import type { AutomaComponentProps } from "@/types/automa";
 
 // Glyph generation helpers
@@ -22,6 +20,31 @@ function randomChar(script: string): number {
   }
 }
 
+// Build fixed character pool from text array
+function buildFixedPool(textArray: string[] | string): Uint32Array {
+  // Handle both array and legacy string format
+  let texts: string[];
+  if (Array.isArray(textArray)) {
+    texts = textArray.map(t => t.trim()).filter(t => t.length > 0);
+  } else {
+    const cleaned = (textArray && textArray.trim()) || "AUTOMA";
+    texts = cleaned.split(',').map(t => t.trim()).filter(t => t.length > 0);
+  }
+  
+  if (!texts.length) return new Uint32Array([65]); // 'A'
+  
+  const result: number[] = [];
+  
+  for (const text of texts) {
+    const chars = Array.from(text);
+    for (const char of chars) {
+      result.push(char.codePointAt(0) || 63);
+    }
+  }
+  
+  return new Uint32Array(result);
+}
+
 // Parse hex color to rgba
 function hexToRgba(hex: string, alpha: number = 1): string {
   if (!hex || !hex.startsWith("#")) return `rgba(255,255,255,${alpha})`;
@@ -33,12 +56,8 @@ function hexToRgba(hex: string, alpha: number = 1): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export function ImageProjectionAutoma({
-  values,
-  width,
-  height,
-  isPaused,
-}: AutomaComponentProps & { isPaused?: boolean }) {
+export function ImageProjectionAutoma(props: AutomaComponentProps) {
+  const { values, width, height, isPaused, onChange } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mediaRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -59,13 +78,13 @@ export function ImageProjectionAutoma({
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatus, setExportStatus] = useState("");
-  const ffmpegRef = useRef<FFmpeg | null>(null);
-  const ffmpegLoadedRef = useRef(false);
 
   // Extract values FIRST (support both old imageUrl and new mediaUrl)
   const {
     cellSize = 16,
     script = "alphabet",
+    fillMode = "random",
+    fixedText = ["AUTOMA"],
     baseColor = "#ffffff",
     baseBrightness = 0.3,
     mediaUrl = "",
@@ -91,10 +110,32 @@ export function ImageProjectionAutoma({
   // Color string cache to avoid repeated string creation
   const colorCacheRef = useRef<Map<string, string>>(new Map());
   
-  // Clear color cache when baseColor changes
+  // Refs for values that can change without restarting render loop
+  const keepColorRef = useRef(keepColor);
+  
+  // Update refs when values change
+  useEffect(() => {
+    keepColorRef.current = keepColor;
+  }, [keepColor]);
+  
+  // Clear color cache when baseColor or keepColor changes
+  // Also limit RGB cache size periodically to prevent unbounded growth
   useEffect(() => {
     colorCacheRef.current.clear();
-  }, [baseColor]);
+    
+    // For keepColor mode (RGB caching), set up periodic cleanup
+    if (keepColor) {
+      const cleanupInterval = setInterval(() => {
+        // If cache gets too large (> 2000 entries), clear it
+        // This prevents memory issues with high-color-variety videos
+        if (colorCacheRef.current.size > 2000) {
+          colorCacheRef.current.clear();
+        }
+      }, 5000); // Check every 5 seconds
+      
+      return () => clearInterval(cleanupInterval);
+    }
+  }, [baseColor, keepColor]);
 
   // Grid state
   const gridRef = useRef<{
@@ -110,6 +151,9 @@ export function ImageProjectionAutoma({
     chars: new Uint32Array(0),
     charStrings: [],
   });
+  
+  // Track grid version to trigger re-render when grid changes
+  const [gridVersion, setGridVersion] = useState(0);
 
   const url = mediaUrl || imageUrl;
   
@@ -169,13 +213,16 @@ export function ImageProjectionAutoma({
         offscreenCtxRef.current = offscreenCanvasRef.current.getContext("2d");
 
         mediaRef.current = video;
-        if (_videoPlaying) {
-          video.play().catch(() => {});
-        }
+        video.currentTime = 0; // Reset to start when importing new media
 
         setIsVideo(true);
         setIsGif(false);
         updateTransformParams(video.videoWidth, video.videoHeight);
+        
+        // Reset time but don't force pause state - let it be controlled by user
+        if (props.onChange) {
+          props.onChange({ ...values, _videoCurrentTime: 0 });
+        }
       };
 
       video.onerror = () => {
@@ -297,6 +344,7 @@ export function ImageProjectionAutoma({
           gifLastTimeRef.current = performance.now();
 
           updateTransformParams(gifWidth, gifHeight);
+          
           setIsGif(true);
           setIsVideo(true); // keep render loop alive
         } catch (e) {
@@ -337,7 +385,7 @@ export function ImageProjectionAutoma({
     };
 
     img.src = url;
-  }, [url, _videoPlaying]);
+  }, [url]);
 
   // Sync video playback state with control (only for actual videos, not GIFs)
   useEffect(() => {
@@ -378,14 +426,30 @@ export function ImageProjectionAutoma({
 
     const chars = new Uint32Array(total);
     const charStrings = new Array(total);
-    for (let i = 0; i < total; i++) {
-      const codePoint = randomChar(script);
-      chars[i] = codePoint;
-      charStrings[i] = String.fromCodePoint(codePoint);
+    
+    // Build character pool based on fillMode
+    if (fillMode === "fixed") {
+      const fixedPool = buildFixedPool(fixedText);
+      const fixedLen = fixedPool.length;
+      for (let i = 0; i < total; i++) {
+        const codePoint = fixedPool[i % fixedLen];
+        chars[i] = codePoint;
+        charStrings[i] = String.fromCodePoint(codePoint);
+      }
+    } else {
+      // Random mode
+      for (let i = 0; i < total; i++) {
+        const codePoint = randomChar(script);
+        chars[i] = codePoint;
+        charStrings[i] = String.fromCodePoint(codePoint);
+      }
     }
 
     gridRef.current = { cols, rows, cell: cellSize, chars, charStrings };
-  }, [width, height, cellSize, script]);
+    
+    // Increment grid version to trigger re-render
+    setGridVersion(v => v + 1);
+  }, [width, height, cellSize, script, fillMode, fixedText]);
 
   // Calculate transform parameters once (cached across sampling calls)
   const transformParamsRef = useRef<{
@@ -462,10 +526,20 @@ export function ImageProjectionAutoma({
     // When media is loaded, use 0 base brightness (follow image color only)
     // brightness stays as calculated from the image
 
-    // Return color if keeping color, otherwise use baseColor with brightness
-    const color = keepColor 
-      ? `rgb(${r}, ${g}, ${b})` 
-      : baseColor;
+    // Only cache RGB colors when keepColor is enabled (dynamic color mode)
+    // In static color mode, we only need brightness, so skip expensive color caching
+    let color = baseColor;
+    if (keepColorRef.current) {
+      // Cache RGB color strings to avoid repeated string creation
+      // Use simple concatenation instead of template literal for better performance
+      const colorKey = `${r},${g},${b}`;
+      let cached = colorCacheRef.current.get(colorKey);
+      if (!cached) {
+        cached = `rgb(${r},${g},${b})`;
+        colorCacheRef.current.set(colorKey, cached);
+      }
+      color = cached;
+    }
 
     return { brightness, color };
   };
@@ -488,36 +562,45 @@ export function ImageProjectionAutoma({
       
       // GIF decoded playback (advance frames manually with accurate timing)
       if (isGif && gifFramesRef.current.length > 0 && gifDelaysRef.current.length > 0) {
-        const now = performance.now();
-        const delays = gifDelaysRef.current;
-        const frames = gifFramesRef.current;
-        let currentIdx = gifFrameIndexRef.current;
-        let elapsed = now - gifLastTimeRef.current;
+        // Only advance frames if not paused
+        if (!isPaused) {
+          const now = performance.now();
+          const delays = gifDelaysRef.current;
+          const frames = gifFramesRef.current;
+          let currentIdx = gifFrameIndexRef.current;
+          let elapsed = now - gifLastTimeRef.current;
 
-        // Advance frames while accounting for elapsed time (limit iterations to prevent lockup)
-        let iterations = 0;
-        const prevIdx = currentIdx;
-        while (elapsed >= delays[currentIdx] && iterations < 10) {
-          elapsed -= delays[currentIdx];
-          currentIdx = (currentIdx + 1) % frames.length;
-          iterations++;
-        }
+          // Advance frames while accounting for elapsed time (limit iterations to prevent lockup)
+          let iterations = 0;
+          const prevIdx = currentIdx;
+          while (elapsed >= delays[currentIdx] && iterations < 10) {
+            elapsed -= delays[currentIdx];
+            currentIdx = (currentIdx + 1) % frames.length;
+            iterations++;
+          }
 
-        // Only update if frame changed
-        if (iterations > 0) {
-          gifFrameIndexRef.current = currentIdx;
-          gifLastTimeRef.current = now - elapsed; // Keep remainder for next frame
-          frameImageDataRef.current = frames[currentIdx];
+          // Only update if frame changed
+          if (iterations > 0) {
+            gifFrameIndexRef.current = currentIdx;
+            gifLastTimeRef.current = now - elapsed; // Keep remainder for next frame
+            frameImageDataRef.current = frames[currentIdx];
+          }
         }
+        // When paused, frameImageDataRef.current already has the last frame - just render it
       } else if (media && offscreenCanvas && offscreenCtx) {
         // Video or static image path
-        if (isVideo) {
+        if (isVideo && media instanceof HTMLVideoElement) {
+          // Always draw current video frame (works for both playing and paused)
           offscreenCtx.drawImage(media, 0, 0);
+          frameImageDataRef.current = offscreenCtx.getImageData(0, 0, media.videoWidth, media.videoHeight);
+          updateTransformParams(media.videoWidth, media.videoHeight);
+        } else if (!isVideo) {
+          // Static image
+          const mediaWidth = media instanceof HTMLVideoElement ? media.videoWidth : media.width;
+          const mediaHeight = media instanceof HTMLVideoElement ? media.videoHeight : media.height;
+          frameImageDataRef.current = offscreenCtx.getImageData(0, 0, mediaWidth, mediaHeight);
+          updateTransformParams(mediaWidth, mediaHeight);
         }
-        const mediaWidth = media instanceof HTMLVideoElement ? media.videoWidth : media.width;
-        const mediaHeight = media instanceof HTMLVideoElement ? media.videoHeight : media.height;
-        frameImageDataRef.current = offscreenCtx.getImageData(0, 0, mediaWidth, mediaHeight);
-        updateTransformParams(mediaWidth, mediaHeight);
       }
 
       // Clear
@@ -541,6 +624,8 @@ export function ImageProjectionAutoma({
       const cellHalf = grid.cell / 2;
       const gridCellHalf50 = grid.cell * 0.5;
       
+      const useKeepColor = keepColorRef.current;
+      
       for (let row = 0; row < grid.rows; row++) {
         const y = row * grid.cell + cellHalf;
         for (let col = 0; col < grid.cols; col++) {
@@ -555,19 +640,18 @@ export function ImageProjectionAutoma({
           fontSizeArray[idx] = Math.round(fontSize);
           
           // Get or cache color
-          if (keepColor) {
+          if (useKeepColor) {
+            // Use the pre-cached RGB color from sample
             colorArray[idx] = sample.color;
           } else {
+            // Generate baseColor with brightness
+            // Static color mode: only ~100 unique brightness values, cache is small
             const brightnessKey = Math.round(brightness * 100);
-            const cacheKey = `${baseColor}-${brightnessKey}`;
+            const cacheKey = `base-${baseColor}-${brightnessKey}`;
             let cached = colorCache.get(cacheKey);
             if (!cached) {
               cached = hexToRgba(baseColor, brightness);
               colorCache.set(cacheKey, cached);
-              if (colorCache.size > 200) {
-                const firstKey = colorCache.keys().next().value;
-                colorCache.delete(firstKey);
-              }
             }
             colorArray[idx] = cached;
           }
@@ -600,13 +684,15 @@ export function ImageProjectionAutoma({
         }
       }
 
-      // Only continue animation if not paused and if we have video/gif media
+      // Continue animation if not paused and we have video/gif media
       if (!isPaused && (isVideo || isGif)) {
         animationRef.current = requestAnimationFrame(draw);
-      } else if (!isPaused && !isVideo && !isGif) {
-        // For static images, just draw once
-        // No need to requestAnimationFrame again
+      } else if (isPaused && (isVideo || isGif)) {
+        // When paused, keep drawing the current frame to maintain visibility
+        // This ensures the canvas shows the last frame instead of going dark
+        animationRef.current = requestAnimationFrame(draw);
       }
+      // For static images, draw once and stop
     };
 
     draw();
@@ -616,33 +702,10 @@ export function ImageProjectionAutoma({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [width, height, isPaused, baseColor, baseBrightness, contrast, invert, keepColor, url, isVideo, isGif, cellSize, script]);
+  }, [width, height, isPaused, baseColor, baseBrightness, contrast, invert, url, isVideo, isGif, cellSize, gridVersion]);
 
-  // Load ffmpeg on mount
-  useEffect(() => {
-    const loadFFmpeg = async () => {
-      if (ffmpegLoadedRef.current) return;
-      
-      try {
-        const ffmpeg = new FFmpeg();
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-        
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-        
-        ffmpegRef.current = ffmpeg;
-        ffmpegLoadedRef.current = true;
-      } catch (err) {
-        console.error('Failed to load FFmpeg:', err);
-      }
-    };
-    
-    loadFFmpeg();
-  }, []);
 
-  // Video export functions
+  // Export function - renders to MP4 with audio
   const startExport = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -653,157 +716,416 @@ export function ImageProjectionAutoma({
       return;
     }
 
-    // Check if ffmpeg is loaded
-    if (!ffmpegRef.current || !ffmpegLoadedRef.current) {
-      alert('Video encoder is still loading. Please try again in a moment.');
-      return;
-    }
+    let audioVideo: HTMLVideoElement | null = null; // Declare here for cleanup in catch
+    const wasPlaying = _videoPlaying; // Store original playing state
+    const wasAnimating = animationRef.current !== null; // Store if animation was running
 
     try {
       setIsExporting(true);
       setExportProgress(0);
-      setExportStatus("Initializing...");
+      setExportStatus("Preparing...");
 
-      const ffmpeg = ffmpegRef.current;
-      const fps = 30;
-      let totalFrames = fps * 5; // Default: 5 seconds for static images
-      let frameDuration = 1000 / fps; // ms per frame
-
-      // For GIF/Video, use actual duration
-      if (isGif && gifDelaysRef.current.length > 0) {
-        // For GIF, render one full loop
-        totalFrames = gifDelaysRef.current.length;
-        frameDuration = gifDelaysRef.current[0]; // Will vary per frame
-      } else if (isVideo && mediaRef.current instanceof HTMLVideoElement) {
-        const videoDuration = mediaRef.current.duration || 5;
-        totalFrames = Math.ceil(videoDuration * fps);
-      }
-
-      setExportStatus(`Rendering ${totalFrames} frames...`);
-
-      // Pause animation during export
+      // Pause main canvas animation during export
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
       }
 
+      // Pause preview video
+      if (isVideo) {
+        props.onChange?.({ ...values, _videoPlaying: false });
+      }
+
+      const media = mediaRef.current;
+      let exportWidth = width;
+      let exportHeight = height;
+      let duration = 5; // Default 5 seconds for static images
+      let fps = 30;
+
+      // For video/gif, use canvas height and original aspect ratio
+      if (isVideo && media instanceof HTMLVideoElement) {
+        // Use canvas height, maintain original aspect ratio
+        const aspectRatio = media.videoWidth / media.videoHeight;
+        
+        // Calculate dimensions that are evenly divisible by cellSize
+        const targetHeight = height;
+        const targetWidth = targetHeight * aspectRatio;
+        
+        // Round to nearest multiple of cellSize
+        // Use Math.round instead of floor to minimize aspect ratio distortion
+        exportHeight = Math.round(targetHeight / cellSize) * cellSize;
+        exportWidth = Math.round(targetWidth / cellSize) * cellSize;
+        
+        duration = media.duration;
+        
+        // For videos, try to match original framerate (default to 30fps for web videos)
+        // Most web videos are 24, 30, or 60 fps
+        fps = 30; // HTMLVideoElement doesn't expose framerate, use standard 30fps
+        
+        // Pause video completely during export
+        media.pause();
+        const wasPaused = media.paused;
+        if (!wasPaused) {
+          // Force pause if it didn't take
+          media.pause();
+        }
+      } else if (isGif && gifFramesRef.current.length > 0) {
+        // Use canvas height, maintain original GIF aspect ratio
+        const originalWidth = gifSizeRef.current?.width || offscreenCanvasRef.current?.width || width;
+        const originalHeight = gifSizeRef.current?.height || offscreenCanvasRef.current?.height || height;
+        const aspectRatio = originalWidth / originalHeight;
+        
+        // Calculate dimensions that are evenly divisible by cellSize
+        const targetHeight = height;
+        const targetWidth = targetHeight * aspectRatio;
+        
+        // Round to nearest multiple of cellSize
+        // Use Math.round instead of floor to minimize aspect ratio distortion
+        exportHeight = Math.round(targetHeight / cellSize) * cellSize;
+        exportWidth = Math.round(targetWidth / cellSize) * cellSize;
+        
+        // Calculate duration from frame delays
+        const totalDelay = gifDelaysRef.current.reduce((sum, d) => sum + d, 0);
+        duration = totalDelay / 1000; // Convert ms to seconds
+        
+        // Use actual frame count and duration for accurate FPS
+        fps = Math.round(gifFramesRef.current.length / duration);
+        // Clamp to reasonable range
+        fps = Math.max(10, Math.min(60, fps));
+      }
+
+      // Create export canvas with media dimensions
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = exportWidth;
+      exportCanvas.height = exportHeight;
+      const exportCtx = exportCanvas.getContext('2d');
+      if (!exportCtx) throw new Error('Failed to create export canvas context');
+
+      setExportStatus("Initializing recorder...");
+
+      // Capture canvas stream
+      const canvasStream = exportCanvas.captureStream(fps);
+      
+      // If video with audio, create separate video element for audio playback
+      let finalStream = canvasStream;
+      
+      if (isVideo && media instanceof HTMLVideoElement) {
+        try {
+          // Create a clone video element for continuous audio playback
+          audioVideo = document.createElement('video');
+          audioVideo.src = media.src || media.currentSrc;
+          audioVideo.muted = false;
+          audioVideo.volume = 1.0;
+          audioVideo.currentTime = 0;
+          
+          // Wait for it to load
+          await new Promise((resolve) => {
+            audioVideo!.onloadedmetadata = resolve;
+          });
+          
+          // Start playing audio video
+          await audioVideo.play();
+          
+          // Capture audio stream from the playing video
+          const audioVideoStream = (audioVideo as any).captureStream ? (audioVideo as any).captureStream() : (audioVideo as any).mozCaptureStream();
+          const audioTracks = audioVideoStream.getAudioTracks();
+          
+          if (audioTracks.length > 0) {
+            // Combine video from canvas with audio from separate playing video
+            finalStream = new MediaStream([
+              ...canvasStream.getVideoTracks(),
+              ...audioTracks
+            ]);
+            console.log('[Export] Audio track added successfully');
+          }
+        } catch (err) {
+          console.warn('[Export] Could not capture audio:', err);
+        }
+      }
+
+      // Setup MediaRecorder with proper audio+video codecs
+      let mimeType = 'video/webm';
+      let options: MediaRecorderOptions = { videoBitsPerSecond: 5000000 };
+      
+      // Check if we have audio
+      const hasAudio = finalStream.getAudioTracks().length > 0;
+
+      // Try different codec combinations (prioritize quality)
+      const codecsToTry = hasAudio ? [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm;codecs=h264,opus',
+        'video/mp4;codecs=h265,opus', // H.265/HEVC - likely unsupported but worth trying
+        'video/mp4;codecs=avc1,opus', // H.264 in MP4
+        'video/webm', // Generic WebM with audio
+        'video/mp4', // Generic MP4
+      ] : [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm;codecs=h264',
+        'video/mp4;codecs=h265', // H.265/HEVC
+        'video/mp4;codecs=avc1', // H.264
+        'video/webm',
+        'video/mp4',
+      ];
+
+      let codecFound = false;
+      for (const codec of codecsToTry) {
+        if (MediaRecorder.isTypeSupported(codec)) {
+          mimeType = codec;
+          options.mimeType = codec;
+          codecFound = true;
+          console.log(`[Export] Using codec: ${codec}`);
+          break;
+        }
+      }
+
+      if (!codecFound) {
+        console.warn('[Export] No specific codec supported, using browser default');
+        // Don't specify mimeType, let browser choose
+        delete options.mimeType;
+      }
+
+      const mediaRecorder = new MediaRecorder(finalStream, options);
+
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        // Clean up audio video if it exists
+        if (audioVideo) {
+          audioVideo.pause();
+          audioVideo.src = '';
+          audioVideo = null;
+        }
+        
+        const blob = new Blob(chunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `automa-export-${Date.now()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        setExportProgress(100);
+        setExportStatus("Complete!");
+        
+        setTimeout(() => {
+          setIsExporting(false);
+          setExportProgress(0);
+          setExportStatus("");
+          
+          // Restore playing state
+          if (isVideo && wasPlaying) {
+            props.onChange?.({ ...values, _videoPlaying: true });
+          }
+          
+          // Restart main canvas animation if it was running
+          if (wasAnimating && (isVideo || isGif)) {
+            // Trigger re-render by updating a dependency (use a small delay to ensure state is settled)
+            setTimeout(() => {
+              if (canvasRef.current) {
+                // Force re-render by touching the canvas
+                canvasRef.current.style.opacity = '0.9999';
+                requestAnimationFrame(() => {
+                  if (canvasRef.current) {
+                    canvasRef.current.style.opacity = '1';
+                  }
+                });
+              }
+            }, 100);
+          }
+        }, 1500);
+      };
+
+      mediaRecorder.start();
+      setExportStatus("Recording...");
+
       // Render frames
-      const frames: Uint8Array[] = [];
+      const totalFrames = Math.ceil(duration * fps);
+      const frameDuration = 1000 / fps;
+      
+      // Create local color cache for export
+      const exportColorCache = new Map<string, string>();
+      
+      // Pre-generate character grid ONCE (not per frame!)
+      const exportCols = Math.floor(exportWidth / cellSize);
+      const exportRows = Math.floor(exportHeight / cellSize);
+      const exportTotal = exportCols * exportRows;
+      
+      // Build character pool based on fillMode - ONCE before the loop
+      let exportCharStrings: string[];
+      if (fillMode === "fixed") {
+        const fixedPool = buildFixedPool(fixedText);
+        const fixedLen = fixedPool.length;
+        exportCharStrings = Array.from({ length: exportTotal }, (_, i) => 
+          String.fromCodePoint(fixedPool[i % fixedLen])
+        );
+      } else {
+        exportCharStrings = Array.from({ length: exportTotal }, () => 
+          String.fromCodePoint(randomChar(script))
+        );
+      }
+      
+      const exportGrid = {
+        cols: exportCols,
+        rows: exportRows,
+        cell: cellSize,
+        charStrings: exportCharStrings,
+      };
+      
+      // Create separate offscreen canvas for export rendering
+      const exportOffscreenCanvas = document.createElement('canvas');
+      const exportOffscreenCtx = exportOffscreenCanvas.getContext('2d');
+      if (!exportOffscreenCtx) throw new Error('Failed to create export offscreen context');
       
       for (let i = 0; i < totalFrames; i++) {
-        // Update frame for GIF/video
-        if (isGif && gifFramesRef.current.length > 0) {
-          const frameIdx = i % gifFramesRef.current.length;
-          frameImageDataRef.current = gifFramesRef.current[frameIdx];
-        } else if (isVideo && mediaRef.current instanceof HTMLVideoElement && offscreenCanvasRef.current && offscreenCtxRef.current) {
-          const video = mediaRef.current;
-          video.currentTime = (i / fps);
+        const currentTime = i / fps;
+        
+        // Get frame data for export (without modifying main canvas refs)
+        let exportFrameData: ImageData | null = null;
+        
+        if (isVideo && media instanceof HTMLVideoElement) {
+          media.currentTime = currentTime;
           await new Promise(resolve => {
-            video.onseeked = () => resolve(null);
+            media.onseeked = () => resolve(null);
           });
-          offscreenCtxRef.current.drawImage(video, 0, 0);
-          frameImageDataRef.current = offscreenCtxRef.current.getImageData(0, 0, video.videoWidth, video.videoHeight);
+          
+          // Render to separate offscreen canvas
+          if (!exportOffscreenCanvas.width) {
+            exportOffscreenCanvas.width = media.videoWidth;
+            exportOffscreenCanvas.height = media.videoHeight;
+          }
+          exportOffscreenCtx.drawImage(media, 0, 0);
+          exportFrameData = exportOffscreenCtx.getImageData(0, 0, media.videoWidth, media.videoHeight);
+        } else if (isGif && gifFramesRef.current.length > 0) {
+          const frameIdx = Math.floor((currentTime / duration) * gifFramesRef.current.length) % gifFramesRef.current.length;
+          exportFrameData = gifFramesRef.current[frameIdx];
+        } else {
+          // Static image - use current frameImageDataRef
+          exportFrameData = frameImageDataRef.current;
         }
 
-        // Render to canvas (reuse existing render logic)
-        const ctx = canvas.getContext("2d");
-        if (!ctx || !gridRef.current || !frameImageDataRef.current || !transformParamsRef.current) continue;
+        // Clear export canvas
+        exportCtx.fillStyle = "#000000";
+        exportCtx.fillRect(0, 0, exportWidth, exportHeight);
+        exportCtx.textBaseline = "middle";
+        exportCtx.textAlign = "center";
 
-        const grid = gridRef.current;
+        // Calculate transform for export canvas (media -> export canvas mapping)
+        if (!exportFrameData) continue; // Skip if no frame data
         
-        // Clear
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, width, height);
-        ctx.textBaseline = "middle";
-        ctx.textAlign = "center";
-
-        // Sample and render (simplified version of main render loop)
-        const cellHalf = grid.cell / 2;
-        const gridCellHalf50 = grid.cell * 0.5;
+        const mediaWidth = exportFrameData.width;
+        const mediaHeight = exportFrameData.height;
+        // Use Math.max (cover) instead of Math.min (contain) to fill canvas without gaps
+        const exportScale = Math.max(exportWidth / mediaWidth, exportHeight / mediaHeight);
+        const scaledMediaWidth = mediaWidth * exportScale;
+        const scaledMediaHeight = mediaHeight * exportScale;
+        const exportOffsetX = (exportWidth - scaledMediaWidth) / 2;
+        const exportOffsetY = (exportHeight - scaledMediaHeight) / 2;
         
-        for (let row = 0; row < grid.rows; row++) {
-          const y = row * grid.cell + cellHalf;
-          for (let col = 0; col < grid.cols; col++) {
-            const x = col * grid.cell + cellHalf;
-            const idx = row * grid.cols + col;
+        // Render to export canvas
+        const cellHalf = exportGrid.cell / 2;
+        const gridCellHalf50 = exportGrid.cell * 0.5;
+        
+        for (let row = 0; row < exportGrid.rows; row++) {
+          const y = row * exportGrid.cell + cellHalf;
+          for (let col = 0; col < exportGrid.cols; col++) {
+            const x = col * exportGrid.cell + cellHalf;
+            const idx = row * exportGrid.cols + col;
             
-            const sample = sampleMedia(x, y);
-            const fontSize = Math.max(8, gridCellHalf50 + sample.brightness * gridCellHalf50);
-            const color = keepColor ? sample.color : hexToRgba(baseColor, sample.brightness);
+            // Map export canvas coords to media coords
+            const mediaX = Math.floor((x - exportOffsetX) / exportScale);
+            const mediaY = Math.floor((y - exportOffsetY) / exportScale);
             
-            ctx.font = `${Math.round(fontSize)}px monospace`;
-            ctx.fillStyle = color;
-            ctx.fillText(grid.charStrings[idx], x, y);
+            let brightness = baseBrightness;
+            let color = baseColor;
+            
+            // Sample pixel from frame data
+            if (mediaX >= 0 && mediaX < mediaWidth && mediaY >= 0 && mediaY < mediaHeight) {
+              const pixelIdx = (mediaY * mediaWidth + mediaX) * 4;
+              const r = exportFrameData.data[pixelIdx];
+              const g = exportFrameData.data[pixelIdx + 1];
+              const b = exportFrameData.data[pixelIdx + 2];
+              
+              // Calculate brightness (luminance)
+              const gray = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+              brightness = contrastLUT[gray];
+              
+              // Invert if needed
+              if (invert) {
+                brightness = 1 - brightness;
+              }
+              
+              // Keep color if enabled
+              if (keepColor) {
+                const colorKey = `${r},${g},${b}`;
+                let cachedColor = exportColorCache.get(colorKey);
+                if (!cachedColor) {
+                  cachedColor = `rgba(${r},${g},${b},${brightness})`;
+                  exportColorCache.set(colorKey, cachedColor);
+                }
+                color = cachedColor;
+              } else {
+                color = hexToRgba(baseColor, brightness);
+              }
+            }
+            
+            const fontSize = Math.max(8, gridCellHalf50 + brightness * gridCellHalf50);
+            
+            exportCtx.font = `${Math.round(fontSize)}px monospace`;
+            exportCtx.fillStyle = color;
+            exportCtx.fillText(exportGrid.charStrings[idx], x, y);
           }
         }
 
-        // Convert canvas to PNG
-        const blob = await new Promise<Blob | null>(resolve => {
-          canvas.toBlob(resolve, 'image/png');
-        });
+        // Use minimal delay to allow canvas stream to capture frame
+        // The captureStream(fps) handles frame rate timing
+        await new Promise(resolve => setTimeout(resolve, 1));
         
-        if (blob) {
-          const arrayBuffer = await blob.arrayBuffer();
-          frames.push(new Uint8Array(arrayBuffer));
-        }
-
-        setExportProgress(Math.floor(((i + 1) / totalFrames) * 50)); // 0-50% for rendering
+        setExportProgress(Math.floor(((i + 1) / totalFrames) * 100));
       }
 
-      // Encode with ffmpeg
-      setExportStatus("Encoding video...");
-
-      // Write frames to ffmpeg filesystem
-      for (let i = 0; i < frames.length; i++) {
-        await ffmpeg.writeFile(`frame${i.toString().padStart(5, '0')}.png`, frames[i]);
-        setExportProgress(50 + Math.floor(((i + 1) / frames.length) * 30)); // 50-80% for writing
-      }
-
-      // Run ffmpeg
-      setExportStatus("Compressing...");
-      await ffmpeg.exec([
-        '-framerate', fps.toString(),
-        '-i', 'frame%05d.png',
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',
-        '-preset', 'medium',
-        'output.mp4'
-      ]);
-
-      setExportProgress(90);
+      // Stop recording
+      mediaRecorder.stop();
       setExportStatus("Finalizing...");
 
-      // Read output
-      const data = await ffmpeg.readFile('output.mp4');
-      const videoBlob = new Blob([data], { type: 'video/mp4' });
-      const videoUrl = URL.createObjectURL(videoBlob);
-      
-      // Download
-      const a = document.createElement('a');
-      a.href = videoUrl;
-      a.download = `automa-export-${Date.now()}.mp4`;
-      a.click();
-      URL.revokeObjectURL(videoUrl);
-
-      // Cleanup ffmpeg filesystem
-      for (let i = 0; i < frames.length; i++) {
-        await ffmpeg.deleteFile(`frame${i.toString().padStart(5, '0')}.png`);
-      }
-      await ffmpeg.deleteFile('output.mp4');
-
-      setExportProgress(100);
-      setExportStatus("Complete!");
-      
-      setTimeout(() => {
-        setIsExporting(false);
-        setExportProgress(0);
-        setExportStatus("");
-      }, 1500);
-
     } catch (err) {
+      // Clean up audio video if it exists
+      if (audioVideo) {
+        audioVideo.pause();
+        audioVideo.src = '';
+        audioVideo = null;
+      }
+      
       setIsExporting(false);
       setExportProgress(0);
       setExportStatus("");
-      alert(`Failed to export video: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Restore playing state
+      if (isVideo && wasPlaying) {
+        props.onChange?.({ ...values, _videoPlaying: true });
+      }
+      
+      // Restart main canvas animation if it was running
+      if (wasAnimating && (isVideo || isGif)) {
+        setTimeout(() => {
+          if (canvasRef.current) {
+            canvasRef.current.style.opacity = '0.9999';
+            requestAnimationFrame(() => {
+              if (canvasRef.current) {
+                canvasRef.current.style.opacity = '1';
+              }
+            });
+          }
+        }, 100);
+      }
+      
+      alert(`Failed to export: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -846,12 +1168,12 @@ export function ImageProjectionAutoma({
               borderRadius: "2px",
               overflow: "hidden"
             }}>
-              <div style={{ 
-                width: `${exportProgress}%`, 
-                height: "100%", 
-                background: "linear-gradient(90deg, #3b82f6, #06b6d4)",
-                transition: "width 0.3s ease"
-              }} />
+            <div style={{ 
+              width: `${exportProgress}%`, 
+              height: "100%", 
+              background: "white",
+              transition: "width 0.3s ease"
+            }} />
             </div>
             <div style={{ color: "#888", fontSize: "11px", marginTop: "4px", textAlign: "right" }}>
               {exportProgress}%

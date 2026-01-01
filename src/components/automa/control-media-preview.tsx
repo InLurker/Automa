@@ -86,7 +86,18 @@ export function ControlMediaPreview({
   const handleLoadedMetadata = () => {
     const video = videoRef.current;
     if (video) {
+      video.currentTime = 0; // Reset to start when importing new media
+      
+      // Sync video element with current playing state
+      if (isPlaying) {
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+      
       setDuration(video.duration);
+      setLocalTime(0);
+      onTimeChange(0);
       setIsLoading(false);
       setHasError(false);
     }
@@ -168,6 +179,7 @@ export function ControlMediaPreview({
             src={mediaUrl}
             loop
             playsInline
+            muted={isMuted}
             onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={handleTimeUpdate}
             onError={handleVideoError}

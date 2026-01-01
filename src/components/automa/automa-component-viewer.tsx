@@ -12,9 +12,10 @@ interface AutomaComponentViewerProps {
   automa: AutomaRegistry;
   values: Record<string, any>;
   isPaused?: boolean;
+  onChange?: (newValues: Record<string, any>) => void;
 }
 
-export function AutomaComponentViewer({ automa, values, isPaused = false }: AutomaComponentViewerProps) {
+export function AutomaComponentViewer({ automa, values, isPaused = false, onChange }: AutomaComponentViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -50,7 +51,7 @@ export function AutomaComponentViewer({ automa, values, isPaused = false }: Auto
       return <div className="text-muted-foreground text-sm">Initializing...</div>;
     }
 
-    const props = { values, ...dimensions, isPaused };
+    const props = { values, ...dimensions, isPaused, onChange };
 
     switch (automa.renderer.component) {
       case "drift":
