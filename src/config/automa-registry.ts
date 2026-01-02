@@ -891,16 +891,13 @@ export const automaRegistry: AutomaRegistry[] = [
           key: "keepColor",
           label: "Static",
         },
-      },
-      {
-        key: "invert",
-        label: "Invert",
-        type: "toggle",
-        group: "Appearance",
-        live: true,
-        visibleWhen: {
-          key: "keepColor",
-          value: false,
+        secondaryToggle: {
+          key: "invert",
+          label: "Invert",
+          visibleWhen: {
+            key: "keepColor",
+            value: false,
+          },
         },
       },
       {

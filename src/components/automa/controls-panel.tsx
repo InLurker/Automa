@@ -158,6 +158,12 @@ export function ControlsPanel({ automa, values: initialValues, onValuesChange }:
               ? (v) => handleChange(param.inlineToggle.key, v, true)
               : undefined
             }
+            secondaryToggleValue={param.secondaryToggle ? values[param.secondaryToggle.key] : undefined}
+            onSecondaryToggleChange={param.secondaryToggle 
+              ? (v) => handleChange(param.secondaryToggle.key, v, true)
+              : undefined
+            }
+            allValues={values}
           />
         );
         break;

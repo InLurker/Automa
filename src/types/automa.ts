@@ -31,6 +31,14 @@ export interface Parameter {
     key: string;
     label: string;
   };
+  secondaryToggle?: {
+    key: string;
+    label: string;
+    visibleWhen?: {
+      key: string;
+      value: any;
+    };
+  };
 }
 
 export interface AutomaRegistry {
