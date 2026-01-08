@@ -460,31 +460,41 @@ export function ImageProjectionAutoma(props: AutomaComponentProps) {
     mediaHeight: number;
   } | null>(null);
 
-  const updateTransformParams = (mediaWidth?: number, mediaHeight?: number) => {
-    const mW = mediaWidth ?? (mediaRef.current instanceof HTMLVideoElement ? mediaRef.current.videoWidth : mediaRef.current?.width ?? 0);
-    const mH = mediaHeight ?? (mediaRef.current instanceof HTMLVideoElement ? mediaRef.current.videoHeight : mediaRef.current?.height ?? 0);
-    if (!mW || !mH) return;
+  const computeTransformParams = (
+    canvasWidth: number,
+    canvasHeight: number,
+    mediaWidth: number,
+    mediaHeight: number
+  ) => {
+    if (!canvasWidth || !canvasHeight || !mediaWidth || !mediaHeight) return null;
 
-    const canvasAspect = width / height;
-    const mediaAspect = mW / mH;
+    const canvasAspect = canvasWidth / canvasHeight;
+    const mediaAspect = mediaWidth / mediaHeight;
 
     let scale: number;
-    let offsetX: number;
-    let offsetY: number;
+    let offsetX = 0;
+    let offsetY = 0;
 
     if (mediaAspect > canvasAspect) {
       // Media is wider - fit to height, crop sides
-      scale = mH / height;
-      offsetX = (mW - width * scale) / 2;
-      offsetY = 0;
+      scale = mediaHeight / canvasHeight;
+      offsetX = (mediaWidth - canvasWidth * scale) / 2;
     } else {
       // Media is taller - fit to width, crop top/bottom
-      scale = mW / width;
-      offsetX = 0;
-      offsetY = (mH - height * scale) / 2;
+      scale = mediaWidth / canvasWidth;
+      offsetY = (mediaHeight - canvasHeight * scale) / 2;
     }
 
-    transformParamsRef.current = { scale, offsetX, offsetY, mediaWidth: mW, mediaHeight: mH };
+    return { scale, offsetX, offsetY, mediaWidth, mediaHeight };
+  };
+
+  const updateTransformParams = (mediaWidth?: number, mediaHeight?: number) => {
+    const mW = mediaWidth ?? (mediaRef.current instanceof HTMLVideoElement ? mediaRef.current.videoWidth : mediaRef.current?.width ?? 0);
+    const mH = mediaHeight ?? (mediaRef.current instanceof HTMLVideoElement ? mediaRef.current.videoHeight : mediaRef.current?.height ?? 0);
+    const transform = computeTransformParams(width, height, mW, mH);
+    if (transform) {
+      transformParamsRef.current = transform;
+    }
   };
 
   // Sample media at given position (optimized - uses cached transform and ImageData)
@@ -710,91 +720,139 @@ export function ImageProjectionAutoma(props: AutomaComponentProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Check if we have media to export
+    if (typeof window === "undefined" || typeof MediaRecorder === "undefined") {
+      alert("Video export requires a browser with MediaRecorder support.");
+      return;
+    }
+
     if (!mediaRef.current) {
       alert('Please load media before exporting.');
       return;
     }
 
-    let audioVideo: HTMLVideoElement | null = null; // Declare here for cleanup in catch
-    const wasPlaying = _videoPlaying; // Store original playing state
-    const wasAnimating = animationRef.current !== null; // Store if animation was running
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    const seekVideoFrame = async (video: HTMLVideoElement, targetTime: number) => {
+      const duration = video.duration;
+      let safeTime = Math.max(targetTime, 0);
+      if (Number.isFinite(duration) && duration > 0) {
+        const maxTime = Math.max(0, duration - 0.001);
+        safeTime = Math.min(safeTime, maxTime);
+      }
+
+      if (Math.abs(video.currentTime - safeTime) < 0.001) {
+        return;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        let timeoutId: number;
+        const cleanup = () => {
+          video.removeEventListener('seeked', handleSeeked);
+          video.removeEventListener('error', handleError);
+          clearTimeout(timeoutId);
+        };
+
+        const handleSeeked = () => {
+          cleanup();
+          resolve();
+        };
+        const handleError = () => {
+          cleanup();
+          reject(new Error('Unable to seek video frame during export.'));
+        };
+        timeoutId = window.setTimeout(() => {
+          cleanup();
+          reject(new Error('Timed out seeking video frame during export.'));
+        }, 4000);
+
+        video.addEventListener('seeked', handleSeeked, { once: true });
+        video.addEventListener('error', handleError, { once: true });
+        video.currentTime = safeTime;
+      });
+    };
+
+    let audioVideo: HTMLVideoElement | null = null;
+    const wasPlaying = _videoPlaying;
+    const videoElement = mediaRef.current instanceof HTMLVideoElement ? mediaRef.current : null;
+    const originalVideoTime = videoElement ? videoElement.currentTime : null;
+    const originalVideoLoop = videoElement?.loop ?? true;
+    let stateRestored = false;
+    const restoreVideoState = () => {
+      if (stateRestored) return;
+      stateRestored = true;
+
+      if (isVideo && videoElement && originalVideoTime !== null) {
+        videoElement.currentTime = originalVideoTime;
+      }
+
+      if (isVideo) {
+        const payload = { ...values, _videoPlaying: wasPlaying };
+        if (originalVideoTime !== null) {
+          payload._videoCurrentTime = originalVideoTime;
+        }
+        props.onChange?.(payload);
+      }
+
+      if (isVideo && videoElement) {
+        videoElement.loop = originalVideoLoop;
+      }
+    };
 
     try {
       setIsExporting(true);
       setExportProgress(0);
       setExportStatus("Preparing...");
 
-      // Pause main canvas animation during export
+      // Pause live animation & preview to avoid state churn
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
 
-      // Pause preview video
       if (isVideo) {
         props.onChange?.({ ...values, _videoPlaying: false });
       }
 
       const media = mediaRef.current;
-      let exportWidth = width;
-      let exportHeight = height;
-      let duration = 5; // Default 5 seconds for static images
+      let duration = 5;
       let fps = 30;
+      let sourceWidth = frameImageDataRef.current?.width ?? width;
+      let sourceHeight = frameImageDataRef.current?.height ?? height;
 
-      // For video/gif, use canvas height and original aspect ratio
       if (isVideo && media instanceof HTMLVideoElement) {
-        // Use canvas height, maintain original aspect ratio
-        const aspectRatio = media.videoWidth / media.videoHeight;
-        
-        // Calculate dimensions that are evenly divisible by cellSize
-        const targetHeight = height;
-        const targetWidth = targetHeight * aspectRatio;
-        
-        // Round to nearest multiple of cellSize
-        // Use Math.round instead of floor to minimize aspect ratio distortion
-        exportHeight = Math.round(targetHeight / cellSize) * cellSize;
-        exportWidth = Math.round(targetWidth / cellSize) * cellSize;
-        
-        duration = media.duration;
-        
-        // For videos, try to match original framerate (default to 30fps for web videos)
-        // Most web videos are 24, 30, or 60 fps
-        fps = 30; // HTMLVideoElement doesn't expose framerate, use standard 30fps
-        
-        // Pause video completely during export
-        media.pause();
-        const wasPaused = media.paused;
-        if (!wasPaused) {
-          // Force pause if it didn't take
-          media.pause();
+        sourceWidth = media.videoWidth || sourceWidth;
+        sourceHeight = media.videoHeight || sourceHeight;
+        const mediaDuration = media.duration;
+        if (Number.isFinite(mediaDuration) && mediaDuration > 0) {
+          duration = mediaDuration;
         }
-      } else if (isGif && gifFramesRef.current.length > 0) {
-        // Use canvas height, maintain original GIF aspect ratio
-        const originalWidth = gifSizeRef.current?.width || offscreenCanvasRef.current?.width || width;
-        const originalHeight = gifSizeRef.current?.height || offscreenCanvasRef.current?.height || height;
-        const aspectRatio = originalWidth / originalHeight;
-        
-        // Calculate dimensions that are evenly divisible by cellSize
-        const targetHeight = height;
-        const targetWidth = targetHeight * aspectRatio;
-        
-        // Round to nearest multiple of cellSize
-        // Use Math.round instead of floor to minimize aspect ratio distortion
-        exportHeight = Math.round(targetHeight / cellSize) * cellSize;
-        exportWidth = Math.round(targetWidth / cellSize) * cellSize;
-        
-        // Calculate duration from frame delays
+        fps = 30;
+
+        await seekVideoFrame(media, 0);
+        media.pause();
+        media.currentTime = 0;
+      } else if (isGif && gifFramesRef.current.length > 0 && gifSizeRef.current) {
+        sourceWidth = gifSizeRef.current.width;
+        sourceHeight = gifSizeRef.current.height;
         const totalDelay = gifDelaysRef.current.reduce((sum, d) => sum + d, 0);
-        duration = totalDelay / 1000; // Convert ms to seconds
-        
-        // Use actual frame count and duration for accurate FPS
+        duration = totalDelay / 1000;
         fps = Math.round(gifFramesRef.current.length / duration);
-        // Clamp to reasonable range
         fps = Math.max(10, Math.min(60, fps));
+      } else if (frameImageDataRef.current) {
+        sourceWidth = frameImageDataRef.current.width;
+        sourceHeight = frameImageDataRef.current.height;
       }
 
-      // Create export canvas with media dimensions
+      if (!Number.isFinite(duration) || duration <= 0) {
+        duration = 5;
+      }
+
+      const safeSourceHeight = sourceHeight || height || cellSize;
+      const safeSourceWidth = sourceWidth || width || cellSize;
+      const exportCols = Math.max(1, Math.floor(safeSourceWidth / cellSize));
+      const exportRows = Math.max(1, Math.floor(safeSourceHeight / cellSize));
+      const exportWidth = exportCols * cellSize;
+      const exportHeight = exportRows * cellSize;
+
       const exportCanvas = document.createElement('canvas');
       exportCanvas.width = exportWidth;
       exportCanvas.height = exportHeight;
@@ -803,71 +861,69 @@ export function ImageProjectionAutoma(props: AutomaComponentProps) {
 
       setExportStatus("Initializing recorder...");
 
-      // Capture canvas stream
       const canvasStream = exportCanvas.captureStream(fps);
-      
-      // If video with audio, create separate video element for audio playback
       let finalStream = canvasStream;
-      
+
       if (isVideo && media instanceof HTMLVideoElement) {
         try {
-          // Create a clone video element for continuous audio playback
-          audioVideo = document.createElement('video');
-          audioVideo.src = media.src || media.currentSrc;
-          audioVideo.muted = false;
-          audioVideo.volume = 1.0;
-          audioVideo.currentTime = 0;
-          
-          // Wait for it to load
-          await new Promise((resolve) => {
-            audioVideo!.onloadedmetadata = resolve;
-          });
-          
-          // Start playing audio video
-          await audioVideo.play();
-          
-          // Capture audio stream from the playing video
-          const audioVideoStream = (audioVideo as any).captureStream ? (audioVideo as any).captureStream() : (audioVideo as any).mozCaptureStream();
-          const audioTracks = audioVideoStream.getAudioTracks();
-          
-          if (audioTracks.length > 0) {
-            // Combine video from canvas with audio from separate playing video
-            finalStream = new MediaStream([
-              ...canvasStream.getVideoTracks(),
-              ...audioTracks
-            ]);
-            console.log('[Export] Audio track added successfully');
+          const sourceUrl = values.mediaUrl || media.currentSrc || media.src;
+          if (sourceUrl) {
+            audioVideo = document.createElement('video');
+            audioVideo.crossOrigin = media.crossOrigin ?? 'anonymous';
+            audioVideo.preload = 'auto';
+            audioVideo.playsInline = true;
+            audioVideo.loop = false;
+            audioVideo.src = sourceUrl;
+            audioVideo.muted = false;
+            audioVideo.volume = 1.0;
+            audioVideo.currentTime = 0;
+
+            await new Promise((resolve) => {
+              audioVideo!.onloadedmetadata = resolve;
+            });
+
+            await audioVideo.play();
+
+            const audioVideoStream = (audioVideo as any).captureStream
+              ? (audioVideo as any).captureStream()
+              : (audioVideo as any).mozCaptureStream();
+            const audioTracks = audioVideoStream.getAudioTracks();
+
+            if (audioTracks.length > 0) {
+              finalStream = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...audioTracks,
+              ]);
+              console.log('[Export] Audio track added successfully');
+            }
           }
         } catch (err) {
           console.warn('[Export] Could not capture audio:', err);
         }
       }
 
-      // Setup MediaRecorder with proper audio+video codecs
       let mimeType = 'video/webm';
       let options: MediaRecorderOptions = { videoBitsPerSecond: 5000000 };
-      
-      // Check if we have audio
       const hasAudio = finalStream.getAudioTracks().length > 0;
-
-      // Try different codec combinations (prioritize quality)
-      const codecsToTry = hasAudio ? [
-        'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=vp8,opus',
-        'video/webm;codecs=h264,opus',
-        'video/mp4;codecs=h265,opus', // H.265/HEVC - likely unsupported but worth trying
-        'video/mp4;codecs=avc1,opus', // H.264 in MP4
-        'video/webm', // Generic WebM with audio
-        'video/mp4', // Generic MP4
-      ] : [
-        'video/webm;codecs=vp9',
-        'video/webm;codecs=vp8',
-        'video/webm;codecs=h264',
-        'video/mp4;codecs=h265', // H.265/HEVC
-        'video/mp4;codecs=avc1', // H.264
-        'video/webm',
-        'video/mp4',
-      ];
+      const codecsToTry = hasAudio
+        ? [
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=h264,opus',
+            'video/mp4;codecs=h265,opus',
+            'video/mp4;codecs=avc1,opus',
+            'video/webm',
+            'video/mp4',
+          ]
+        : [
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm;codecs=h264',
+            'video/mp4;codecs=h265',
+            'video/mp4;codecs=avc1',
+            'video/webm',
+            'video/mp4',
+          ];
 
       let codecFound = false;
       for (const codec of codecsToTry) {
@@ -882,12 +938,10 @@ export function ImageProjectionAutoma(props: AutomaComponentProps) {
 
       if (!codecFound) {
         console.warn('[Export] No specific codec supported, using browser default');
-        // Don't specify mimeType, let browser choose
         delete options.mimeType;
       }
 
       const mediaRecorder = new MediaRecorder(finalStream, options);
-
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -896,13 +950,12 @@ export function ImageProjectionAutoma(props: AutomaComponentProps) {
       };
 
       mediaRecorder.onstop = () => {
-        // Clean up audio video if it exists
         if (audioVideo) {
           audioVideo.pause();
           audioVideo.src = '';
           audioVideo = null;
         }
-        
+
         const blob = new Blob(chunks, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -913,221 +966,198 @@ export function ImageProjectionAutoma(props: AutomaComponentProps) {
 
         setExportProgress(100);
         setExportStatus("Complete!");
-        
+        restoreVideoState();
+
         setTimeout(() => {
           setIsExporting(false);
           setExportProgress(0);
           setExportStatus("");
-          
-          // Restore playing state
-          if (isVideo && wasPlaying) {
-            props.onChange?.({ ...values, _videoPlaying: true });
-          }
-          
-          // Restart main canvas animation if it was running
-          if (wasAnimating && (isVideo || isGif)) {
-            // Trigger re-render by updating a dependency (use a small delay to ensure state is settled)
-            setTimeout(() => {
-              if (canvasRef.current) {
-                // Force re-render by touching the canvas
-                canvasRef.current.style.opacity = '0.9999';
-                requestAnimationFrame(() => {
-                  if (canvasRef.current) {
-                    canvasRef.current.style.opacity = '1';
-                  }
-                });
-              }
-            }, 100);
-          }
-        }, 1500);
+        }, 1000);
       };
 
       mediaRecorder.start();
       setExportStatus("Recording...");
 
-      // Render frames
-      const totalFrames = Math.ceil(duration * fps);
+      const totalFrames = Math.max(1, Math.ceil(duration * fps));
       const frameDuration = 1000 / fps;
-      
-      // Create local color cache for export
-      const exportColorCache = new Map<string, string>();
-      
-      // Pre-generate character grid ONCE (not per frame!)
-      const exportCols = Math.floor(exportWidth / cellSize);
-      const exportRows = Math.floor(exportHeight / cellSize);
       const exportTotal = exportCols * exportRows;
-      
-      // Build character pool based on fillMode - ONCE before the loop
+
       let exportCharStrings: string[];
       if (fillMode === "fixed") {
         const fixedPool = buildFixedPool(fixedText);
         const fixedLen = fixedPool.length;
-        exportCharStrings = Array.from({ length: exportTotal }, (_, i) => 
+        exportCharStrings = Array.from({ length: exportTotal }, (_, i) =>
           String.fromCodePoint(fixedPool[i % fixedLen])
         );
       } else {
-        exportCharStrings = Array.from({ length: exportTotal }, () => 
+        exportCharStrings = Array.from({ length: exportTotal }, () =>
           String.fromCodePoint(randomChar(script))
         );
       }
-      
+
       const exportGrid = {
         cols: exportCols,
         rows: exportRows,
         cell: cellSize,
         charStrings: exportCharStrings,
       };
-      
-      // Create separate offscreen canvas for export rendering
+
       const exportOffscreenCanvas = document.createElement('canvas');
       const exportOffscreenCtx = exportOffscreenCanvas.getContext('2d');
       if (!exportOffscreenCtx) throw new Error('Failed to create export offscreen context');
-      
-      for (let i = 0; i < totalFrames; i++) {
-        const currentTime = i / fps;
-        
-        // Get frame data for export (without modifying main canvas refs)
-        let exportFrameData: ImageData | null = null;
-        
-        if (isVideo && media instanceof HTMLVideoElement) {
-          media.currentTime = currentTime;
-          await new Promise(resolve => {
-            media.onseeked = () => resolve(null);
-          });
-          
-          // Render to separate offscreen canvas
-          if (!exportOffscreenCanvas.width) {
-            exportOffscreenCanvas.width = media.videoWidth;
-            exportOffscreenCanvas.height = media.videoHeight;
-          }
-          exportOffscreenCtx.drawImage(media, 0, 0);
-          exportFrameData = exportOffscreenCtx.getImageData(0, 0, media.videoWidth, media.videoHeight);
-        } else if (isGif && gifFramesRef.current.length > 0) {
-          const frameIdx = Math.floor((currentTime / duration) * gifFramesRef.current.length) % gifFramesRef.current.length;
-          exportFrameData = gifFramesRef.current[frameIdx];
-        } else {
-          // Static image - use current frameImageDataRef
-          exportFrameData = frameImageDataRef.current;
-        }
 
-        // Clear export canvas
-        exportCtx.fillStyle = "#000000";
-        exportCtx.fillRect(0, 0, exportWidth, exportHeight);
-        exportCtx.textBaseline = "middle";
-        exportCtx.textAlign = "center";
+      let exportMapping: Int32Array | null = null;
+      let mappingMediaWidth = 0;
+      let mappingMediaHeight = 0;
+      const buildExportMapping = (mediaWidth: number, mediaHeight: number) => {
+        if (!mediaWidth || !mediaHeight) return null;
 
-        // Calculate transform for export canvas (media -> export canvas mapping)
-        if (!exportFrameData) continue; // Skip if no frame data
-        
-        const mediaWidth = exportFrameData.width;
-        const mediaHeight = exportFrameData.height;
-        // Use Math.max (cover) instead of Math.min (contain) to fill canvas without gaps
-        const exportScale = Math.max(exportWidth / mediaWidth, exportHeight / mediaHeight);
-        const scaledMediaWidth = mediaWidth * exportScale;
-        const scaledMediaHeight = mediaHeight * exportScale;
-        const exportOffsetX = (exportWidth - scaledMediaWidth) / 2;
-        const exportOffsetY = (exportHeight - scaledMediaHeight) / 2;
-        
-        // Render to export canvas
+        exportMapping = new Int32Array(exportTotal);
+
+        const sx = mediaWidth / exportWidth;
+        const sy = mediaHeight / exportHeight;
+
         const cellHalf = exportGrid.cell / 2;
-        const gridCellHalf50 = exportGrid.cell * 0.5;
-        
+
         for (let row = 0; row < exportGrid.rows; row++) {
           const y = row * exportGrid.cell + cellHalf;
           for (let col = 0; col < exportGrid.cols; col++) {
             const x = col * exportGrid.cell + cellHalf;
             const idx = row * exportGrid.cols + col;
-            
-            // Map export canvas coords to media coords
-            const mediaX = Math.floor((x - exportOffsetX) / exportScale);
-            const mediaY = Math.floor((y - exportOffsetY) / exportScale);
-            
-            let brightness = baseBrightness;
-            let color = baseColor;
-            
-            // Sample pixel from frame data
-            if (mediaX >= 0 && mediaX < mediaWidth && mediaY >= 0 && mediaY < mediaHeight) {
-              const pixelIdx = (mediaY * mediaWidth + mediaX) * 4;
-              const r = exportFrameData.data[pixelIdx];
-              const g = exportFrameData.data[pixelIdx + 1];
-              const b = exportFrameData.data[pixelIdx + 2];
-              
-              // Calculate brightness (luminance)
-              const gray = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
-              brightness = contrastLUT[gray];
-              
-              // Invert if needed
-              if (invert) {
-                brightness = 1 - brightness;
-              }
-              
-              // Keep color if enabled
-              if (keepColor) {
-                const colorKey = `${r},${g},${b}`;
-                let cachedColor = exportColorCache.get(colorKey);
-                if (!cachedColor) {
-                  cachedColor = `rgba(${r},${g},${b},${brightness})`;
-                  exportColorCache.set(colorKey, cachedColor);
-                }
-                color = cachedColor;
-              } else {
-                color = hexToRgba(baseColor, brightness);
-              }
-            }
-            
-            const fontSize = Math.max(8, gridCellHalf50 + brightness * gridCellHalf50);
-            
-            exportCtx.font = `${Math.round(fontSize)}px monospace`;
-            exportCtx.fillStyle = color;
-            exportCtx.fillText(exportGrid.charStrings[idx], x, y);
+
+            const mediaX = Math.min(mediaWidth - 1, Math.max(0, Math.floor(x * sx)));
+            const mediaY = Math.min(mediaHeight - 1, Math.max(0, Math.floor(y * sy)));
+
+            exportMapping[idx] = (mediaY * mediaWidth + mediaX) * 4;
           }
         }
 
-        // Use minimal delay to allow canvas stream to capture frame
-        // The captureStream(fps) handles frame rate timing
-        await new Promise(resolve => setTimeout(resolve, 1));
-        
+        return exportMapping;
+      };
+
+      for (let i = 0; i < totalFrames; i++) {
+        const currentTime = i / fps;
+
+        let exportFrameData: ImageData | null = null;
+
+        if (isVideo && media instanceof HTMLVideoElement) {
+          await seekVideoFrame(media, currentTime);
+          if (
+            exportOffscreenCanvas.width !== media.videoWidth ||
+            exportOffscreenCanvas.height !== media.videoHeight
+          ) {
+            exportOffscreenCanvas.width = media.videoWidth;
+            exportOffscreenCanvas.height = media.videoHeight;
+          }
+          exportOffscreenCtx.drawImage(
+            media,
+            0,
+            0,
+            media.videoWidth,
+            media.videoHeight
+          );
+          exportFrameData = exportOffscreenCtx.getImageData(
+            0,
+            0,
+            media.videoWidth,
+            media.videoHeight
+          );
+        } else if (isGif && gifFramesRef.current.length > 0) {
+          const frameIdx = Math.floor((currentTime / duration) * gifFramesRef.current.length) % gifFramesRef.current.length;
+          exportFrameData = gifFramesRef.current[frameIdx];
+        } else if (frameImageDataRef.current) {
+          exportFrameData = frameImageDataRef.current;
+        }
+
+        if (!exportFrameData) continue;
+
+        const mapping = buildExportMapping(exportFrameData.width, exportFrameData.height);
+        if (!mapping) continue;
+
+        exportCtx.fillStyle = "#000000";
+        exportCtx.fillRect(0, 0, exportWidth, exportHeight);
+        exportCtx.textBaseline = "middle";
+        exportCtx.textAlign = "center";
+
+        const gridCellHalf50 = exportGrid.cell * 0.5;
+        const useKeepColor = keepColor;
+        const exportColorCache = new Map<string, string>();
+        const data = exportFrameData.data;
+
+        let currentFontSize = -1;
+        let currentColor = '';
+
+        for (let idx = 0; idx < exportTotal; idx++) {
+          const pixelIdx = mapping[idx];
+          let brightness = baseBrightness;
+          let color = baseColor;
+
+          if (pixelIdx >= 0) {
+            const r = data[pixelIdx];
+            const g = data[pixelIdx + 1];
+            const b = data[pixelIdx + 2];
+
+            const gray = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+            brightness = contrastLUT[gray];
+
+            if (invert && !keepColor) {
+              brightness = 1 - brightness;
+            }
+
+            if (useKeepColor) {
+              const colorKey = `${r},${g},${b}`;
+              let cachedColor = exportColorCache.get(colorKey);
+              if (!cachedColor) {
+                cachedColor = `rgb(${r},${g},${b})`;
+                exportColorCache.set(colorKey, cachedColor);
+              }
+              color = cachedColor;
+            } else {
+              color = hexToRgba(baseColor, brightness);
+            }
+          }
+
+          const row = Math.floor(idx / exportCols);
+          const col = idx % exportCols;
+          const x = col * exportGrid.cell + exportGrid.cell / 2;
+          const y = row * exportGrid.cell + exportGrid.cell / 2;
+          const fontSize = Math.max(8, gridCellHalf50 + brightness * gridCellHalf50);
+          const roundedFont = Math.round(fontSize);
+
+          if (roundedFont !== currentFontSize) {
+            exportCtx.font = `${roundedFont}px monospace`;
+            currentFontSize = roundedFont;
+          }
+          if (color !== currentColor) {
+            exportCtx.fillStyle = color;
+            currentColor = color;
+          }
+
+          exportCtx.fillText(exportGrid.charStrings[idx], x, y);
+        }
+
+        await sleep(frameDuration);
         setExportProgress(Math.floor(((i + 1) / totalFrames) * 100));
       }
 
-      // Stop recording
       mediaRecorder.stop();
       setExportStatus("Finalizing...");
 
     } catch (err) {
-      // Clean up audio video if it exists
       if (audioVideo) {
         audioVideo.pause();
         audioVideo.src = '';
         audioVideo = null;
       }
-      
+
       setIsExporting(false);
       setExportProgress(0);
       setExportStatus("");
-      
-      // Restore playing state
-      if (isVideo && wasPlaying) {
-        props.onChange?.({ ...values, _videoPlaying: true });
-      }
-      
-      // Restart main canvas animation if it was running
-      if (wasAnimating && (isVideo || isGif)) {
-        setTimeout(() => {
-          if (canvasRef.current) {
-            canvasRef.current.style.opacity = '0.9999';
-            requestAnimationFrame(() => {
-              if (canvasRef.current) {
-                canvasRef.current.style.opacity = '1';
-              }
-            });
-          }
-        }, 100);
-      }
-      
+      restoreVideoState();
       alert(`Failed to export: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
+
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
